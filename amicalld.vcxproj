@@ -193,6 +193,7 @@
     <None Include="amicalld_d.conf" />
     <None Include="amicalld_t.conf" />
     <None Include="Makefile" />
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="amiaction.cpp" />

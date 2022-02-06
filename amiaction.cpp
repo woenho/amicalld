@@ -8,7 +8,7 @@
 */
 #include "amiaction.h"
 
-int set_callinfo(const char* caller, CallInfo_t* info)
+int set_DTMFcallinfo(const char* caller, CallInfo_t* info)
 {
 	char buf[512];
 
@@ -29,7 +29,7 @@ int set_callinfo(const char* caller, CallInfo_t* info)
 
 }
 
-int get_callinfo(const char* caller, CallInfo_t* info)
+int get_DTMFcallinfo(const char* caller, CallInfo_t* info)
 {
 	if (!info)
 		return 1;
@@ -38,8 +38,8 @@ int get_callinfo(const char* caller, CallInfo_t* info)
 	if (!data)
 		return 2;
 
-	// 첫 항목은 'C:' 이어야 amicalld에서 사용하는 콜러정보이다
-	if (*data != 'C') {
+	// 첫 항목은 'D:' 이어야 DTMF에서 사용하는 콜러정보이다
+	if (*data != 'D') {
 		free(data);
 		return 3;
 	}
@@ -276,7 +276,7 @@ PAMI_RESPONSE amiSendDtmf(const char* caller, const char* dir, const char* dtmf)
 		}
 	}
 
-	if (get_callinfo(caller, &ci)) {
+	if (get_DTMFcallinfo(caller, &ci)) {
 		conft("channel get not found(caller=%s)\n", caller);
 		resp = new AMI_RESPONSE;
 		resp->result = 404;
@@ -332,7 +332,7 @@ PAMI_RESPONSE amiBlindTransfer(const char* caller, const char* callee, const cha
 
 	CallInfo_t ci = { 0 };
 
-	if (get_callinfo(caller, &ci)) {
+	if (get_DTMFcallinfo(caller, &ci)) {
 		conft("channel get not found(caller=%s)\n", caller);
 		resp = new AMI_RESPONSE;
 		resp->result = 404;

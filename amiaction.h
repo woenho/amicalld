@@ -13,8 +13,8 @@ typedef struct CallInfo_t {
 	char szDestUniqueid[64];
 }CallInfo;
 
-int set_callinfo(const char* caller, CallInfo_t* info);
-int get_callinfo(const char* caller, CallInfo_t* info);
+int set_DTMFcallinfo(const char* caller, CallInfo_t* info);
+int get_DTMFcallinfo(const char* caller, CallInfo_t* info);
 
 ATP_STAT amiLogin(PATP_DATA atp_data);
 

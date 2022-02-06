@@ -79,36 +79,53 @@ ATP_STAT event_userevent(AMI_EVENTS& events)
 			strncpy(ci.szExten, szExten, sizeof(ci.szExten) - 1);
 			strncpy(ci.szChannel, szChannel, sizeof(ci.szChannel) - 1);
 			strncpy(ci.szUniqueid, szUniqueid, sizeof(ci.szUniqueid) - 1);
-			if (set_callinfo(szCallerIDNum, &ci)) {
+			if (set_DTMFcallinfo(szCallerIDNum, &ci)) {
 				conft("/set_callinfo error, caller=%s", szCallerIDNum);
 			}
 			else {
 				conft("/set_callinfo, caller=%s, Channel=%s", szCallerIDNum, szChannel);
 			}
 
-		}
-		else if (!strcmp(szEventName, "DTMF_STOP")) {
-			// memcached에 다이알로그 삭제
+		} else if (!strcmp(szEventName, "DTMF_STOP")) {
 			logging_events(events);
 
 #if defined(DEBUG)
 			conpt("--- %s, %s\n", szEventName, szCallerIDNum);
 #endif
+			// memcached에 다이알로그 삭제
 			// delete 는 memcached 내부적으로 막혀있다. 그래서 1초뒤에 사라지게 하고 새로 설정될 값은 "" 이다..
 			set_memcached(szCallerIDNum, "", 1);
 
-		}
-		else {
+		} else if (!strcmp(szEventName, "CALLD_START")) {
+			logging_events(events);
+
+#if defined(DEBUG)
+			conpt("--- %s, %s\n", szEventName, szCallerIDNum);
+#endif
+
+			// 콜센타 정보를 등록한다
+
+
+		} else if (!strcmp(szEventName, "CALLD_STOP")) {
+			logging_events(events);
+
+#if defined(DEBUG)
+			conpt("--- %s, %s\n", szEventName, szCallerIDNum);
+#endif
+
+			// 콜센타 정보를 삭제한다
+
+
+
+		} else {
 			throw util_exception(999, "Invalid UserEvent type. event name:%s, channel=%s", szEventName, szChannel);
 		}
 
-	}
-	catch (util_exception& e) {
+	} catch (util_exception& e) {
 		if (e.code() != 999) {
 			conft("m_code=%d, %s", e.code(), e.what());
 		}
-	}
-	catch (...) {
+	} catch (...) {
 		conft("errno=%d, %s", errno, strerror(errno));
 	}
 
@@ -175,7 +192,7 @@ ATP_STAT event_dialend(AMI_EVENTS& events)
 
 			szCallerIDNum = get_amivalue(events, "CallerIDNum");
 #if defined(USE_USEREVENT_CALLSTARTED)
-			if (get_callinfo(szCallerIDNum, &ci)) {
+			if (get_DTMFcallinfo(szCallerIDNum, &ci)) {
 				conft("memcached get not found, caller=%s\n", szCallerIDNum);
 				throw util_exception(999, "memcached get not found");
 			}
@@ -208,7 +225,7 @@ ATP_STAT event_dialend(AMI_EVENTS& events)
 
 			strncpy(ci.szDestChannel, szDestChannel, sizeof(ci.szDestChannel) - 1);
 			strncpy(ci.szDestUniqueid, szDestUniqueid, sizeof(ci.szDestUniqueid) - 1);
-			if (set_callinfo(szCallerIDNum, &ci)) {
+			if (set_DTMFcallinfo(szCallerIDNum, &ci)) {
 				conft("/set_callinfo error, caller=%s", szCallerIDNum);
 			}
 			else {

@@ -7,6 +7,8 @@ extern char amicalldCompileDate[20];
 
 char cfg_path[512] = { 0 };
 
+int main(int argc, char* argv[]);
+
 void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 {
 	sigset_t sigset, oldset;
@@ -164,6 +166,7 @@ TST_STAT calld_disconnected(PTST_SOCKET psocket) {
 	return tst_suspend;
 }
 
+
 int main(int argc, char* argv[])
 {
 	if (argc == 2 && !strcmp(argv[1], "-v")) {
@@ -285,7 +288,7 @@ int main(int argc, char* argv[])
 			// 연결을 시도하는 작업 요청
 			PATP_DATA atpdata = atp_alloc(sizeof(AMI_LOGIN));
 			AMI_LOGIN& login = *(PAMI_LOGIN)&atpdata->s;
-			strncpy(login.Host, g_cfg.Get("AMI", "host","127.0.0.1").c_str(), sizeof(login.Host));
+			strncpy(login.Host, g_cfg.Get("AMI", "host", "127.0.0.1").c_str(), sizeof(login.Host));
 			login.Port = atoi(g_cfg.Get("AMI", "port", "5038").c_str());
 			strncpy(login.Username, g_cfg.Get("AMI", "user", "call").c_str(), sizeof(login.Username));
 			strncpy(login.Secret, g_cfg.Get("AMI", "secret", "call").c_str(), sizeof(login.Secret));
@@ -306,4 +309,3 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
-
