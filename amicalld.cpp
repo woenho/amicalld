@@ -261,7 +261,7 @@ int main(int argc, char* argv[])
 	map<const char*, const char*>::iterator it_name;
 	for (it = g_process.begin(); it != g_process.end(); it++) {
 		it_name = g_process_name.find(it->first);
-		conft(":%s: -> %s(), func address -> %lX", it->first, it_name == g_process_name.end() ? "" : it_name->second, ADDRESS(it->second));
+		conft(":%s: -> %s(), address -> %lX", it->first, it_name == g_process_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	g_route.clear();
@@ -270,14 +270,14 @@ int main(int argc, char* argv[])
 	ADD_HTTP_EVENT_PROCESS("/keepalive", http_alive);
 	for (it = g_route.begin(); it != g_route.end(); it++) {
 		it_name = g_route_name.find(it->first);
-		conft(":%s: -> %s(), http route func address -> %lX", it->first, it_name == g_route_name.end() ? "" : it_name->second, ADDRESS(it->second));
+		conft(":%s: -> %s(), address -> %lX", it->first, it_name == g_route_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	g_websocket.clear();
 	ADD_WS_EVENT_PROCESS("/alive", websocket_alive);
 	for (it = g_websocket.begin(); it != g_websocket.end(); it++) {
 		it_name = g_websocket_name.find(it->first);
-		conft(":%s: -> %s(), websocket route func address -> %lX", it->first, it_name == g_websocket_name.end() ? "" : it_name->second, ADDRESS(it->second));
+		conft(":%s: -> %s(), address -> %lX", it->first, it_name == g_websocket_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	// -------------------------------------------------------------------------------------

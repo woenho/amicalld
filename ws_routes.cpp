@@ -42,7 +42,7 @@ TST_STAT websocket_alive(PTST_SOCKET psocket)
 		return tst_disconnect;
 	}
 
-	TRACE("--ws- recv text opcode, len=%u:%s:\n", (uint32_t)wsinfo.data_len, wsinfo.data);
+	TRACE("--ws- recv text opcode, len=%lu:%s:\n", wsinfo.data_len, wsinfo.data);
 
 	// 들어온 데이타는 text 이다...
 	if(wsinfo.data_len < 1) {

@@ -163,11 +163,11 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 		Payload len == 127 : 세번째 바이트 부터 열번째 바이트의 값이 unsigned 64int 형식으로
 							 마스킹키 다음 데이타구간에 실린 데이타의 실제 길이
 							 (단 첫번째 비트는 반드시 0이어야 한다.즉 63비트만 유효함)
-							 이경우는 최대 길이를 제한할 필요가 있다.아니면 이 값에 다라 시스템이 오동작한다(메모리 확보실패.등등...)
+							 이 경우는 최대 길이를 제한할 필요가 있다.아니면 이 값에 따라 시스템이 오동작한다(메모리 확보실패.등등...)
 	}
-	3. 일단 길이값이 구해지면 해당 길이만큼의 데이타를 수신해야한다.
+	3. 일단 길이 값이 구해지면 해당 길이만큼의 데이타를 수신해야한다.
 		수신이 완료되면 데이타 복호화작업을 한다.
-	4. 데이타 암복호화 : 마스킹 값을 가지고 비트마스킹(XOR)하여 복호화작업을 한다
+	4. 데이타 복호화 : 마스킹 값을 가지고 비트마스킹(XOR)하여 복호화작업을 한다
 		데이타 첫번째 바이트와 마스킹 첫번째 바이트,
 		데이타 두번째 바이트와 마스킹 두번째 바이트,
 		데이타 세번째 바이트와 마스킹 세번째 바이트,
@@ -196,7 +196,7 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 
 	TRACE("--ws- recv message %s\n", wsinfo.step ? "end" : "start");
 
-	// 이미 기본 헤더를 받은 경우의 처리 ( 헤더를 받고 데이타가 커서 데이타 수신일수도 있다.)
+	// 이미 기본 헤더를 받은 경우의 처리 ( 헤더를 받고 데이타가 커서 데이타 수신일 수도 있다.)
 	if (!wsinfo.step) {
 		int m_len = 4;
 		int m_pos = 0;
@@ -212,25 +212,14 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 		wsinfo.is_masked = prdata->s[1] & 0x80;
 		wsinfo.data_len = prdata->s[1] & 0x7F; // 데이타길이 확인
 		if (wsinfo.data_len < 126) {
-			m_pos = 2;
-			if (wsinfo.is_masked) {
-				prdata->com_len += read(psocket->sd, prdata->s + prdata->com_len, m_len); // mask 길이 만큼 더 읽자
-			}
+			// 지금 읽은 값이 데이타 길이이다
 		} else if (wsinfo.data_len == 126) {
-			m_pos = 4;
 			prdata->com_len += read(psocket->sd, prdata->s + prdata->com_len, 2); // data길이 정보 만큼 더 읽자
 			wsinfo.data_len = ntohs(*(uint16_t*)(&prdata->s[2]));
-			if (wsinfo.is_masked) {
-				prdata->com_len += read(psocket->sd, prdata->s + prdata->com_len, m_len); // 마스크길이 만큼 더 읽자
-			}
 		} else {
 			// wsinfo.data_len == 127
-			m_pos = 10;
 			prdata->com_len += read(psocket->sd, prdata->s + prdata->com_len, 8); // data길이 정보 만큼 더 읽자
 			wsinfo.data_len = (((uint64_t)ntohl(*(uint32_t*)(&prdata->s[2]))) << 32) + ntohl(*(uint32_t*)(&prdata->s[6]));
-			if (wsinfo.is_masked) {
-				prdata->com_len += read(psocket->sd, prdata->s + prdata->com_len, m_len); // 마스크길이 만큼 더 읽자
-			}
 
 			//  1024* 1024 * 10 => 10485760
 			if (wsinfo.data_len > 10485760) {
@@ -239,9 +228,14 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 				return tst_disconnect;
 			}
 		}
+
 		if (wsinfo.is_masked) {
+			m_pos = prdata->com_len;
+			prdata->com_len += read(psocket->sd, prdata->s + prdata->com_len, m_len); // 마스크길이 만큼 더 읽자
 			memcpy(wsinfo.mask, &prdata->s[m_pos], m_len);
 		}
+
+		// 헤더를 다 읽었다.
 		wsinfo.step = 1;
 
 		if (wsinfo.data_len > prdata->s_len) {
@@ -257,14 +251,16 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 			psocket->recv = new_ptr;
 			prdata = psocket->recv;
 		}
-		// 읽기 락을 걸까?.......
 		
+		// 수신할 버퍼포인트 재설정		
 		wsinfo.data = prdata->s;
+		// 수신할 버퍼 초기화
 		prdata->reset_data();
 
+		// tstpool 소켓은 비동기 소켓으로 전체 길이를 주어도 들어온 만큼만 읽고 바로 리턴된다
 		prdata->com_len = read(psocket->sd, prdata->s, wsinfo.data_len);
 		if (prdata->com_len < wsinfo.data_len) {
-			// tstpoll 의 자동 받기 기능으로 나머지 데이타를 모두 받자
+			// tstpool 의 자동 받기 기능으로 나머지 데이타를 모두 받자
 			prdata->req_pos = prdata->com_len;
 			prdata->req_len = wsinfo.data_len - prdata->req_pos;
 			prdata->com_len = 0;
@@ -274,9 +270,9 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 
 	// 모든 데이타 받기가 종료된 다음 복호화 작업을 한다
 	if (wsinfo.is_masked) {
-		size_t i;
+		uint64_t i;  // 64bit CPU는 BYTE 나 64bit 처리속도가 같다. 32bit CPU or OS 라면 성능 차이 있다.
 		TRACE("--ws- completed websocket data length=%ld\n", wsinfo.data_len);
-		for (i = 0; i < (size_t)wsinfo.data_len; i++) {
+		for (i = 0; i < wsinfo.data_len; i++) {
 			wsinfo.data[i] ^= wsinfo.mask[i & 3];
 		}
 	}
@@ -306,10 +302,12 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 	}
 
 	// 사용자함수가 지정되지 않은 라우팅에 대한 처리는?????
-
-
-
-
+	// ping or disconnect  왜에는 할 것이 없다.
+	if (wsinfo.is_ping)
+	{
+		TRACE("--ws- recv ping opcode\n");
+		ws_writepong(psocket);
+	}
 
 	// 다음데이타를 연이어 받지 않는 일반적인 경우라면 반드시 리셋 되어야 한다
 	prdata->reset_data();
