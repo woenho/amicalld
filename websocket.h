@@ -57,6 +57,8 @@ typedef struct WS_INFO_T {
 } WS_INFO, *PWS_INFO;
 
 extern map<const char*, void*> g_websocket;
+extern map<const char*, const char*> g_websocket_name;
+#define ADD_WS_EVENT_PROCESS(a, b)	{g_websocket[a] = (void*)b; g_websocket_name[a] = #b;}
 
 void ws_writeping(PTST_SOCKET psocket);
 void ws_writepong(PTST_SOCKET psocket);

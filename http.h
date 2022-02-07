@@ -66,6 +66,8 @@ typedef struct http_request_info {
 }REQUEST_INFO, * PREQUEST_INFO;
 
 extern map<const char*, void*> g_route;
+extern map<const char*, const char*> g_route_name;
+#define ADD_HTTP_EVENT_PROCESS(a, b)	{g_route[a] = (void*)b; g_route_name[a] = #b;}
 
 const char* get_httpheader(REQUEST_INFO& req, const char* header_name);
 void response_http(PTST_SOCKET psocket, PRESPONSE_INFO presp);

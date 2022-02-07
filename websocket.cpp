@@ -14,6 +14,7 @@
 extern int log_event_level;
 
 map<const char*, void*> g_websocket;
+map<const char*, const char*> g_websocket_name;
 
 void ws_writeping(PTST_SOCKET psocket) {
 	char buf[4];

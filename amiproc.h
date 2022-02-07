@@ -100,7 +100,7 @@ extern tstpool server;				// 기본적인 tcp epoll 관리쓰레드 풀 클래�
 extern PTST_SOCKET ami_socket;		// ami 연결용 TST_SOCKET 구조체로 new 로 직접 생성하여 server.addsocket(ami_socket)으로 추가등록하고 epoll 도 직접 등록한다.
 extern map<const char*, void*> g_process;
 extern map<const char*, const char*> g_process_name;
-#define ADD_AMI_EVENT_PROCESS(a, b)	g_process[a] = (void*)b; g_process_name[a] = #b;
+#define ADD_AMI_EVENT_PROCESS(a, b)	{g_process[a] = (void*)b; g_process_name[a] = #b;}
 extern int log_event_level;
 
 int parse_amievent(AMI_EVENTS& events);

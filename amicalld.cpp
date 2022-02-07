@@ -254,10 +254,8 @@ int main(int argc, char* argv[])
 	// 처리할 이벤트를 등록 한다....
 
 	g_process.clear();
-	//g_process["UserEvent"] = (void*)event_userevent;
-	//g_process["DialEnd"] = (void*)event_dialend;
-	ADD_AMI_EVENT_PROCESS("UserEvent", event_userevent)
-	ADD_AMI_EVENT_PROCESS("DialEnd", event_dialend)
+	ADD_AMI_EVENT_PROCESS("UserEvent", event_userevent);
+	ADD_AMI_EVENT_PROCESS("DialEnd", event_dialend);
 
 	map<const char*, void*>::iterator it;
 	map<const char*, const char*>::iterator it_name;
@@ -267,17 +265,19 @@ int main(int argc, char* argv[])
 	}
 
 	g_route.clear();
-	g_route["/dtmf"] = (void*)http_dtmf;
-	g_route["/transfer"] = (void*)http_transfer;
-	g_route["/keepalive"] = (void*)http_alive;
+	ADD_HTTP_EVENT_PROCESS("/dtmf", http_dtmf);
+	ADD_HTTP_EVENT_PROCESS("/transfer", http_transfer);
+	ADD_HTTP_EVENT_PROCESS("/keepalive", http_alive);
 	for (it = g_route.begin(); it != g_route.end(); it++) {
-		conft(":%s: http route func address -> %lX\n", it->first, ADDRESS(it->second));
+		it_name = g_route_name.find(it->first);
+		conft(":%s: -> %s(), http route func address -> %lX", it->first, it_name == g_route_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	g_websocket.clear();
-	g_websocket["/alive"] = (void*)websocket_alive;
-	for (it = g_route.begin(); it != g_route.end(); it++) {
-		conft(":%s: websocket route func address -> %lX\n", it->first, ADDRESS(it->second));
+	ADD_WS_EVENT_PROCESS("/alive", websocket_alive);
+	for (it = g_websocket.begin(); it != g_websocket.end(); it++) {
+		it_name = g_websocket_name.find(it->first);
+		conft(":%s: -> %s(), websocket route func address -> %lX", it->first, it_name == g_websocket_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	// -------------------------------------------------------------------------------------

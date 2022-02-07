@@ -13,6 +13,7 @@
 
 
 map<const char*, void*> g_route;
+map<const char*, const char*> g_route_name;
 
 // 일단 기동되는 tcp 서버는 HTTP 프로토콜을 지원하도록 한다
 // 외부에서 amiprocess에 연결하여 요청하는 것은 기본적으로 http GET 메소드를 지원한다
