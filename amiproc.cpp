@@ -25,6 +25,7 @@
 tstpool server;						// 기본적인 tcp epoll 관리쓰레드 풀 클래스 객체
 PTST_SOCKET ami_socket = NULL;		// ami 연결용 TST_SOCKET 구조체로 new 로 직접 생성하여 server.addsocket(ami_socket)으로 추가등록하고 epoll 도 직접 등록한다.
 map<const char*, void*> g_process;	// ami event 중 처리하고자 하는 이벹에 대한 함수포인터를 등록해 둔다
+map<const char*, const char*> g_process_name; // ami event process function anme
 int log_event_level = 0;				// 0이 아닌 값이 설정되면 event 명을 로깅한다
 
 void* rm_ami_socket(tst::TST_USER_T* puser) {

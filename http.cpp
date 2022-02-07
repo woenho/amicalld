@@ -260,6 +260,22 @@ TST_STAT http(PTST_SOCKET psocket)
 			if (req.request_uri && *req.request_uri) urlDecodeRewite(req.request_uri);
 			if (req.query_string && *req.query_string) urlDecodeRewite((char*)req.query_string);
 
+			// not support Transfer-Encoding: chunked
+			// Transfer-Encoding: chunked
+			// Transfer-Encoding: compress
+			// Transfer-Encoding: deflate
+			// Transfer-Encoding: gzip
+			// Transfer-Encoding: identity
+			const char* encode = get_httpheader(req, "Transfer-Encoding");
+			if (encode && *encode) {
+				resp.http_version = req.http_version;
+				resp.http_code = 501;
+				resp.response_text = "Not Implemented 'Transfer-Encoding'";
+				resp.html_text = resp.response_text;
+				response_http(psocket, &resp);
+				return tst_disconnect;
+			}
+
 			int length = atoi(get_httpheader(req, "Content-Length"));
 			if (length) {
 				if (length > (int)(rdata.s_len - rdata.com_len)) {

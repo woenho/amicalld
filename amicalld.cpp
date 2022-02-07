@@ -254,12 +254,16 @@ int main(int argc, char* argv[])
 	// 처리할 이벤트를 등록 한다....
 
 	g_process.clear();
-	g_process["UserEvent"] = (void*)event_userevent;
-	g_process["DialEnd"] = (void*)event_dialend;
+	//g_process["UserEvent"] = (void*)event_userevent;
+	//g_process["DialEnd"] = (void*)event_dialend;
+	ADD_AMI_EVENT_PROCESS("UserEvent", event_userevent)
+	ADD_AMI_EVENT_PROCESS("DialEnd", event_dialend)
 
 	map<const char*, void*>::iterator it;
+	map<const char*, const char*>::iterator it_name;
 	for (it = g_process.begin(); it != g_process.end(); it++) {
-		conft(":%s: event func address -> %lX\n", it->first, ADDRESS(it->second));
+		it_name = g_process_name.find(it->first);
+		conft(":%s: -> %s(), func address -> %lX", it->first, it_name == g_process_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	g_route.clear();
