@@ -2,12 +2,17 @@
 #include "http.h"
 #include "websocket.h"
 #include "processevents.h"
+#include "amicalld.h"
 
 extern char amicalldCompileDate[20];
 
-char cfg_path[512] = { 0 };
+map<const char*, PQueue>* g_pqueue = new map<const char*, PQueue>;
+map<const char*, PAgent>* g_pagent = new map<const char*, PAgent>;
+map<const char*, PHistory> g_history;
 
-int main(int argc, char* argv[]);
+char g_queue_path[512] = { 0 };	// queue & agent 환경파일이 존재하는 폴더경로
+
+char cfg_path[512] = { 0 };
 
 void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 {
@@ -39,6 +44,7 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 
 		conft("atp compile date: %s", atpCompileDate);
 		conft("tst compile date: %s", tstCompileDate);
+		conft("util compile date: %s", amiutilCompileDate);
 		conft("calld compile date: %s", amicalldCompileDate);
 
 		conft("atp thread Realtime queue count=%d", nQueueRealtime);
@@ -67,6 +73,8 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 			log_event_level = atoi(cfg.Get("LOG","ev_level").c_str());
 		}
 		conft("log_event_level=%d", log_event_level);
+		
+		reload_queue();
 	}
 	else if (signo == SIGUSR1) // kill -10 어떤 시스템은 30, 시스템마다 다름
 	{
@@ -78,6 +86,7 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 
 		conft("atp compile date: %s", atpCompileDate);
 		conft("tst compile date: %s", tstCompileDate);
+		conft("util compile date: %s", amiutilCompileDate);
 		conft("calld compile date: %s", amicalldCompileDate);
 
 		conft("atp thread Realtime queue count=%d", nQueueRealtime);
@@ -173,6 +182,7 @@ int main(int argc, char* argv[])
 		printf("\namicalld version 2.0\n\n");
 		printf("atp compile date: %s\n", atpCompileDate);
 		printf("tst compile date: %s\n", tstCompileDate);
+		printf("util compile date: %s\n", amiutilCompileDate);
 		printf("calld compile date: %s\n", amicalldCompileDate);
 		return 0;
 	}
@@ -209,6 +219,12 @@ int main(int argc, char* argv[])
 	}
 	if (logmethod) free(logmethod);
 
+	strcpy(g_queue_path, g_cfg.Get("CALLD", "path", ".").c_str());
+	
+	if (!reload_queue())
+		return -1;
+
+
 #if defined(DEBUGTRACE)
 	conft("\n------------------------\n trace debuging info CALLD server start. pid(%d)\n========================================", getpid());
 #elif defined(DEBUG)
@@ -218,6 +234,7 @@ int main(int argc, char* argv[])
 #endif
 	conft("atp compile date: %s", atpCompileDate);
 	conft("tst compile date: %s", tstCompileDate);
+	conft("util compile date: %s", amiutilCompileDate);
 	conft("calld compile date: %s", amicalldCompileDate);
 
 	if (signal_init(&sig_handler, true) < 0)
@@ -312,4 +329,267 @@ int main(int argc, char* argv[])
 	atp_destroy(gracefully);
 
 	return 0;
+}
+
+void remove_queue(map<const char*, PQueue>& r_queue)
+{
+	map<const char*, PQueue>::iterator it_queue;
+
+	for (it_queue = r_queue.begin(); it_queue != r_queue.end(); it_queue++) {
+		delete it_queue->second;
+	}
+	r_queue.clear();
+}
+
+int add_queue(map<const char*, PQueue>& r_queue, CKeyset& ks)
+{
+	if (!*ks.getvalue("queue_id"))
+		return -9;
+
+	PQueue pqueue = new CQueue;
+	strncpy(pqueue->queue_id, ks.getvalue("queue_id"), sizeof(pqueue->queue_id) - 1);
+	
+	if (*ks.getvalue("playment")) pqueue->playment = true;
+	if (*ks.getvalue("recording")) pqueue->recording = true;
+	pqueue->queueing = !strcmp(ks.getvalue("queueing"), "inline");
+
+
+	map<const char*, PQueue>::iterator it_queue = r_queue.find(pqueue->queue_id);
+	if (it_queue == r_queue.end()) {
+		r_queue[pqueue->queue_id] = pqueue;
+	}
+	else {
+		delete pqueue;
+		return -1;
+	}
+
+	return 0;
+}
+
+void CAgent::setquelist(const char* list)
+{
+	char* queueid_list = strdup(list);
+	char* next = queueid_list;
+	char* queue;
+	while (*next) {
+		queue = next;
+		next = strpbrk(next, ",;|");  // {',',';','|'} 3개 중 아무거난 구분자로 사용할 수 있다.
+		if (!next) {
+			// last token
+			rtrim(queue);
+			if (queue && *queue) {
+				queuelist.push_back(strdup(queue));
+			}
+			break;
+		}
+		*next++ = '\0';
+		rtrim(queue);
+		if (queue && *queue) {
+			queuelist.push_back(strdup(queue));
+		}
+		while (*next && *next == ' ')
+			next++;
+		queue = next;
+	}
+	free(queueid_list);
+}
+
+bool reload_queue()
+{
+	const char* err1 = "콜센타환경파일 지정오류";
+	char szPath[512] = { 0, };
+	int i = 0;
+
+	map<const char*, PQueue>* l_pqueue = new map<const char*, PQueue>;
+	map<const char*, PQueue>& l_queue = *l_pqueue;
+	map<const char*, PAgent>* l_pagent = new map<const char*, PAgent>;
+	map<const char*, PAgent>& l_agent = *l_pagent;
+	map<const char*, PQueue>::iterator it_queue;
+	map<const char*, PAgent>::iterator it_agent;
+	map<const char*, PHistory>::iterator it_history;
+	PQueue pqueue;
+	PAgent pagent;
+	PHistory phistory;
+
+	CKeyset* pks;
+	map<const char*, CKeyset*>::iterator it_ks;
+	list<char*>::iterator it_list;
+
+	CFileConfig fileQueue, fileAgent;
+
+	int rc;
+
+	if (!*g_queue_path) {
+		conpt(err1);
+		delete(l_pqueue);
+		delete(l_pagent);
+		return false;
+	}
+
+	l_queue.clear();
+
+	// -----------------------------------------------------
+	// ------ queue config loading -------------------------
+	// -----------------------------------------------------
+
+	snprintf(szPath, sizeof(szPath) - 1, "%s/calld_queue.conf", g_queue_path);
+
+
+	rc = fileQueue.load(szPath);
+	if (rc < 0) {
+		delete(l_pqueue);
+		delete(l_pagent);
+		return false;
+	}
+
+	for (it_ks = fileQueue.m_config.begin(); it_ks != fileQueue.m_config.end(); it_ks++) {
+		pks = it_ks->second;
+#ifdef DEBUG
+		conpt("queue id: %s", it_ks->first);
+		for (i = 0; i < pks->getcount(); i++) {
+			conpt("\t%s=%s", pks->getkey(i), pks->getvalue(i));
+		}
+#endif
+		pqueue = new CQueue;
+		strncpy(pqueue->queue_id, pks->getks(), sizeof(pqueue->queue_id) - 1);
+		strncpy(pqueue->queue_name, pks->getvalue("name"), sizeof(pqueue->queue_name) - 1);
+		pqueue->playment = *pks->getvalue("playment") == 'Y';
+		pqueue->recording = *pks->getvalue("recording") == 'Y';
+		pqueue->queueing = strcmp(pks->getvalue("queueing"), "inline") == 0;
+		l_queue[pqueue->queue_id] = pqueue;
+	}
+	
+	// -----------------------------------------------------
+	// ------ agent config loading -------------------------
+	// -----------------------------------------------------
+
+	snprintf(szPath, sizeof(szPath) - 1, "%s/calld_agent.conf", g_queue_path);
+	rc = fileAgent.load(szPath);
+	if (rc < 0) {
+		delete(l_pqueue);
+		delete(l_pagent);
+		return false;
+	}
+
+	for (it_ks = fileAgent.m_config.begin(); it_ks != fileAgent.m_config.end(); it_ks++) {
+		pks = it_ks->second;
+#ifdef DEBUG
+		conpt("agent id: %s", it_ks->first);
+		for (i = 0; i < pks->getcount(); i++) {
+			conpt("\t%s=%s", pks->getkey(i), pks->getvalue(i));
+		}
+#endif
+		pagent = new CAgent;
+		strncpy(pagent->agnet_id, pks->getks(), sizeof(pagent->agnet_id) - 1);
+		strncpy(pagent->agent_pw, pks->getvalue("password"), sizeof(pagent->agent_pw) - 1);
+		strncpy(pagent->agent_name, pks->getvalue("agent_name"), sizeof(pagent->agent_name) - 1);
+		strncpy(pagent->phone, pks->getvalue("phone"), sizeof(pagent->phone) - 1);
+		pagent->setquelist(pks->getvalue("queue"));
+		
+		for (it_list = pagent->queuelist.begin(); it_list != pagent->queuelist.end(); it_list++) {
+			// char*를 l_queue.find(*it_list) 찾으면 안된다
+			for (it_queue = l_queue.begin(); it_queue != l_queue.end(); it_queue++) {
+				if (!strcmp(*it_list, it_queue->first)) {
+					it_queue->second->m_agent[pagent->agnet_id] = pagent;
+					conpt("add agent, queue=%s, agent=(%s:%s)", it_queue->first , pagent->agnet_id, pagent->agent_name);
+					break;
+				}
+			}
+			if (it_queue == l_queue.end()) {
+				conpt("등록되지 않은 큐에 qgent를 할당하려고 했다.환경파일 오류처리 (%s)", *it_list);
+				delete(l_pqueue);
+				delete(l_pagent);
+				return false;
+			}
+		}
+		l_agent[pagent->agnet_id] = pagent;
+	}
+
+	// -----------------------------------------------------
+	// ------ merge config & history -------------------------
+	// -----------------------------------------------------
+
+	// 전제조건: 
+	// 1. 작성된 히스토리는 삭제하지 않는다
+	// 2. 기존 연결된 에이전트 중 새로 로딩된 현경에 없는 에이전트는 접속 종료한다
+	// 
+	// senario
+	// 1. 큐의 히스토리 map 을 복사한다
+	for (it_history = g_history.begin(); it_history != g_history.end(); it_history++) {
+		phistory = it_history->second;
+		// char*를 l_queue.find(phistory->queue) 찾으면 안된다
+		for (it_queue = l_queue.begin(); it_queue != l_queue.end(); it_queue++) {
+			if (!strcmp(phistory->queue, it_queue->first)) {
+				l_queue.find(phistory->agent_id)->second->m_history[phistory->histoyr_key] = phistory;
+				break;
+			}
+		}
+	}
+	// 2. 구 에이전트 중 신 에이전트에 없는 에이전트는 접속 종료한다 (상담중인 에이전트는?)
+	for (it_agent = g_pagent->begin(); it_agent != g_pagent->end(); it_agent++) {
+		pagent = it_agent->second;
+		map<const char*, PAgent>::iterator iter;
+		// char*를 l_agent.find(pagent->agnet_id) 찾으면 안된다
+		for (iter = l_agent.begin(); iter != l_agent.end(); iter++) {
+			if (!strcmp(pagent->agnet_id, iter->first)) {
+				// 이번에도 사용중으로 찾았다 
+				break;
+			}
+		}
+		if (it_agent == l_agent.end()) {
+#ifdef DEBUG
+			// logging
+
+#endif
+			// 구 에이전트가 새 에이전트 목록에서 삭제되었다.
+			// 접속 종료 처리......
+			// 상담중이면????
+			// 향후 추가 코딩키로....
+
+
+		}
+	}
+	// 3. 새 정보를 구 정보로 대체한다
+	map<const char*, PQueue>* g_pqueue_old = g_pqueue;
+	map<const char*, PAgent>* g_pagent_old = g_pagent;
+	g_pqueue = l_pqueue;
+	g_pagent = l_pagent;
+	delete(g_pqueue_old);
+	delete(g_pagent_old);
+
+
+
+
+
+#ifdef DEBUG
+	conpt("\n-------------------------------------\nall queue info\n--------------------------------------");
+	for (it_queue = g_pqueue->begin(); it_queue != g_pqueue->end(); it_queue++) {
+		pqueue = it_queue->second;
+		conpt("queue_id=%s", pqueue->queue_id);
+		conpt("\tqueue_name=%s", pqueue->queue_name);
+		conpt("\tplayment=%d", pqueue->playment);
+		conpt("\trecording=%d", pqueue->recording);
+		conpt("\tqueueing=%s", pqueue->queueing ? "inline" : "all");
+		conpt("\tagent list:");
+		for (it_agent = pqueue->m_agent.begin(); it_agent != pqueue->m_agent.end(); it_agent++) {
+			conpt("\t\t(%s:%s)", it_agent->second->agnet_id, it_agent->second->agent_name );
+		}
+	}
+#endif
+
+
+
+
+
+
+
+
+
+	// -----------------------------------------------------
+	// ------ agent config loading -------------------------
+	// -----------------------------------------------------
+
+
+
+	return true;
 }

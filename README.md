@@ -58,44 +58,43 @@ class CQueue {<br/>
 	map<const char*, CAgent*> m_agent;		// key: [agent_id] <br/>
 	map<const char*, CHistory*> m_history;	// key: [caller + begin]<br/>
 	string callee;		// 상담전화번호 (agent 가 가진 내부전화번호가 아님)<br/>
-	bool playment;		// 이 전화에 안내멘트를 플레이 하는가?
-	bool recording;		// 이 전화는 통화를 녹음하는가?
-	string queing;		// 상agent에게 순차작으로 연결하는지 모든 agemt에 동시 벨을 울리는지?
+	bool playment;		// 이 전화에 안내멘트를 플레이 하는가?<br/>
+	bool recording;		// 이 전화는 통화를 녹음하는가?<br/>
+	string queueing;	// 상agent에게 순차작으로 연결하는지 모든 agemt에 동시 벨을 울리는지?<br/>
 }<br/>
 <br/>
 {4. 환경파일 구조}<br/>
-[queue]<br/>
-queue_id= 큐 고유이름<br/>
-callee= 상담전화번호<br/>
-playment={Y/N}<br/>
-recording={Y/N}<br/>
-queing={inline,all}<br/>
+[123456]				// [queue_id]<br/>
+name=상담전화_1			// [queue name]<br/>
+playment=N				// 안내멘트플레이 여부<br/>
+recording=Y				// 상담내역 녹취여부<br/>
+queueing={inline,all}	// 상담사 연결방식<br/>
 <br/>
-[agent]<br/>
-queue_id = a_queue, b_queue, c_queue	// 등록된 queue list <br/>
-agnet_id = login_id	// 로그인아이디<br/>
-agent_pw = login_pw <br/>
-agent_name = 상담다이름 <br/>
-phone =	상담사내부전화번호	// 상담사가 전화를 받을 내부 전화번호<br/>
+[홍길동]					// 상담사 로그인 아이디<br/>
+password = password1	// 상담사 로그인 암호<br/>
+agent_name = 상담자_A1	// 상담사 신분<br/>
+queue = {queue_id_1}, {queue_id_2}, {queue_id_3}	// 연결된 queue 목록<br/>
+phone =	800020003		// 상담사 내부 전화번호<br/>
 <br/>
-{5.연동 라이브러리}
-1. tstpool
-2. AsyncThreadPool
-3. amiutil
+{5.연동 라이브러리}<br/>
+1. tstpool<br/>
+2. AsyncThreadPool<br/>
+3. amiutil<br/>
+<br/>
 
- 
-개발노트
-1. 환경정보 메모리 구조 개발
-2. 환경파일 로딩 개발, 동작중 환경파일 재로딩 개발
-3. 상담원 로그인 / 로그아웃 및 연동된 처리 개발
-4. {기본 / 부재중 / 기록} 목록관리 시스템구성 개발
-5. 수신전화 상담원 알람 개발
-6. 통화연결 상담원 알람 개발
-7. 상담내역 입력 및 기록 저장 개발
-8. 부재중 처리 개발
-9. 부재중 전화 콜백 처리 개발
-10. 안내멘트처리(TTS) 연동서버 추가개발
-
+개발노트<br/>
+1. 환경정보 메모리 구조 개발<br/>
+2. 환경파일 로딩 개발, 동작중 환경파일 재로딩 개발<br/>
+3. 상담원 로그인 / 로그아웃 및 연동된 처리 개발<br/>
+4. {기본 / 부재중 / 기록} 목록관리 시스템구성 개발<br/>
+5. 수신전화 상담원 알람 개발<br/>
+6. 통화연결 상담원 알람 개발<br/>
+7. 상담내역 입력 및 기록 저장 개발<br/>
+8. 부재중 처리 개발<br/>
+9. 부재중 전화 콜백 처리 개발<br/>
+10. 안내멘트처리(TTS) 연동서버 추가개발<br/>
+11. webrtc를 통한 상담<br/>
+<br/>
 
 
 

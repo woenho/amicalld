@@ -167,31 +167,37 @@
     <RemoteReBuildCommandLine>make clean debugtrace</RemoteReBuildCommandLine>
     <RemoteCleanCommandLine>make clean</RemoteCleanCommandLine>
     <NMakeIncludeSearchPath>../amiutil;../AsyncThreadPool;../tst;dist/json</NMakeIncludeSearchPath>
+    <NMakePreprocessorDefinitions>DEBUG;DEBUGTRACE</NMakePreprocessorDefinitions>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugTrace|ARM64'">
     <RemoteBuildCommandLine>make clean debugtrace</RemoteBuildCommandLine>
     <RemoteReBuildCommandLine>make clean debugtrace</RemoteReBuildCommandLine>
     <RemoteCleanCommandLine>make clean</RemoteCleanCommandLine>
     <NMakeIncludeSearchPath>../amiutil;../AsyncThreadPool;../tst;dist/json</NMakeIncludeSearchPath>
+    <NMakePreprocessorDefinitions>DEBUG;DEBUGTRACE</NMakePreprocessorDefinitions>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugTrace|x64'">
     <RemoteBuildCommandLine>make clean debugtrace</RemoteBuildCommandLine>
     <RemoteReBuildCommandLine>make clean debugtrace</RemoteReBuildCommandLine>
     <RemoteCleanCommandLine>make clean</RemoteCleanCommandLine>
     <NMakeIncludeSearchPath>../amiutil;../AsyncThreadPool;../tst;dist/json</NMakeIncludeSearchPath>
+    <NMakePreprocessorDefinitions>DEBUG;DEBUGTRACE</NMakePreprocessorDefinitions>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugTrace|x86'">
     <RemoteBuildCommandLine>make clean debugtrace</RemoteBuildCommandLine>
     <RemoteReBuildCommandLine>make clean debugtrace</RemoteReBuildCommandLine>
     <RemoteCleanCommandLine>make clean</RemoteCleanCommandLine>
     <NMakeIncludeSearchPath>../amiutil;../AsyncThreadPool;../tst;dist/json</NMakeIncludeSearchPath>
+    <NMakePreprocessorDefinitions>DEBUG;DEBUGTRACE</NMakePreprocessorDefinitions>
   </PropertyGroup>
   <ItemGroup>
     <None Include=".editorconfig" />
-    <None Include="amicall" />
+    <None Include="calld" />
     <None Include="amicalld.conf" />
     <None Include="amicalld_d.conf" />
     <None Include="amicalld_t.conf" />
+    <None Include="conf\calld_agent.conf" />
+    <None Include="conf\calld_queue.conf" />
     <None Include="Makefile" />
     <None Include="README.md" />
   </ItemGroup>
@@ -207,6 +213,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="amiaction.h" />
+    <ClInclude Include="amicalld.h" />
     <ClInclude Include="amiproc.h" />
     <ClInclude Include="http.h" />
     <ClInclude Include="processevents.h" />

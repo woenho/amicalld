@@ -72,10 +72,12 @@ trace:
 
 install:
 	mkdir -p ~/bin
-	chmod 0755 dtmf
-	cp -p dtmf ~/bin	# 복사하면 크론탭 멈출 수 있음
+	chmod 0755 calld
+	cp -p calld ~/bin	# 복사하면 크론탭 멈출 수 있음
 	cp $(TARGET).conf ~/bin
 	cp $(TARGET) ~/bin
+	mkdir -p ~/bin/conf
+	cp -p conf/* ~/bin/conf
 
 clean:
 	rm -f $(TARGET) *.o
