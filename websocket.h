@@ -3,6 +3,7 @@
 #define __WEBSOCKET_H__
 
 #include "http.h"
+#include "amicalld.h"
 
 /* New nomenclature */
 enum {
@@ -17,6 +18,7 @@ enum {
 typedef enum { ws_base = 100 } WebSocket_TYPE;
 
 typedef struct WS_INFO_T {
+	PAgent	agent;
 	// ws 패킷 값
 	char opcode;
 	uint64_t data_len;
@@ -62,13 +64,16 @@ extern map<const char*, const char*> g_websocket_name;
 
 void ws_writeping(PTST_SOCKET psocket);
 void ws_writepong(PTST_SOCKET psocket);
-void ws_writedisconnect(PTST_SOCKET psocket, uint16_t status);
-int ws_writetext(PTST_SOCKET psocket, const char* text);
+void ws_writedisconnect(PTST_SOCKET psocket, uint16_t status=1000);
+int ws_writetext(PTST_SOCKET psocket, const char* fmt, ...);
 TST_STAT websocket(PTST_SOCKET psocket);
 
 
 // 이하는 ws_routes.cpp 용으로 실제 메시지처리 함수 등록
 TST_STAT websocket_alive(PTST_SOCKET psocket);
+TST_STAT websocket_admin(PTST_SOCKET psocket);
+TST_STAT websocket_login(PTST_SOCKET psocket);
+TST_STAT websocket_call(PTST_SOCKET psocket);
 
 
 #endif

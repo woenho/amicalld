@@ -5,14 +5,45 @@
 #include "amicalld.h"
 
 extern char amicalldCompileDate[20];
+extern int g_processmon_sd;
 
-map<const char*, PQueue>* g_pqueue = new map<const char*, PQueue>;
-map<const char*, PAgent>* g_pagent = new map<const char*, PAgent>;
-map<const char*, PHistory> g_history;
+map<string, PQueue>* g_pqueue = new map<string, PQueue>;
+map<string, PAgent>* g_pagent = new map<string, PAgent>;
+map<string, PHistory, std::greater<string> > g_history;
+map<string, PQueue>* g_pold_queue = NULL;
+map<string, PAgent>* g_pold_agent = NULL;
 
 char g_queue_path[512] = { 0 };	// queue & agent 환경파일이 존재하는 폴더경로
 
 char cfg_path[512] = { 0 };
+
+
+void CAgent::setqueuelist(const char* list)
+{
+	char* queueid_list = strdup(list);
+	char* next = queueid_list;
+	char* queue;
+	while (*next) {
+		queue = next;
+		next = strpbrk(next, ",;|");  // {',',';','|'} 3개 중 아무거나 구분자로 사용할 수 있다.
+		if (!next) {
+			// last token
+			rtrim(queue);
+			if (queue && *queue) {
+				queuelist.push_back(queue);
+			}
+			break;
+		}
+		*next++ = '\0';
+		rtrim(queue);
+		if (queue && *queue) {
+			queuelist.push_back(queue);
+		}
+		while (*next && (*next == ' ' || *next == '\t'))
+			next++;
+	}
+	free(queueid_list);
+}
 
 void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 {
@@ -160,12 +191,33 @@ TST_STAT calld_disconnected(PTST_SOCKET psocket) {
 		// }
 	} else {
 #ifdef DEBUG
-		conpt("--- disconnected client socket....%s(%s:%d)", __func__, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
+		conpt("--- disconnected client socket....sd=%d, type=%d (%s:%d)", psocket->sd, psocket->type, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
 #endif
 		if (psocket->type == sock_websocket) {
 			TRACE("--ws- websocket session이 해제되었다.\n");
 			
 			// websocket 해제 시 keepalive 중단 처리필요함
+			if (g_processmon_sd == psocket->sd) {
+				g_processmon_sd = 0;
+				conpt("--- disconnected processmon socket....sd=%d (%s:%d)", psocket->sd, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
+			}
+
+			// agent 가 접속 종료하면 그 상태처리를 한다.
+			WS_INFO& wsinfo = *(PWS_INFO)psocket->user_data->s;
+			PAgent pagent = wsinfo.agent;
+			if (!pagent) {
+				// 아직 로그인 하지 않아서 에이전트 정보가 설정되지 않았다.
+				return tst_suspend;
+			}
+
+			// 로그인했던 에이전트는 로그아웃 시 처리할 것들이 있다.
+			// 1. 로그인 상태 변환
+			// 2. 다른 큐 및 로그인 사용자 화면에 해당 내역 반영
+
+			pagent->status = 0;
+
+
+
 
 
 
@@ -292,6 +344,8 @@ int main(int argc, char* argv[])
 
 	g_websocket.clear();
 	ADD_WS_EVENT_PROCESS("/alive", websocket_alive);
+	ADD_WS_EVENT_PROCESS("/admin", websocket_admin);
+	ADD_WS_EVENT_PROCESS("/login", websocket_login);
 	for (it = g_websocket.begin(); it != g_websocket.end(); it++) {
 		it_name = g_websocket_name.find(it->first);
 		conft(":%s: -> %s(), address -> %lX", it->first, it_name == g_websocket_name.end() ? "" : it_name->second, ADDRESS(it->second));
@@ -331,93 +385,34 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-void remove_queue(map<const char*, PQueue>& r_queue)
-{
-	map<const char*, PQueue>::iterator it_queue;
-
-	for (it_queue = r_queue.begin(); it_queue != r_queue.end(); it_queue++) {
-		delete it_queue->second;
-	}
-	r_queue.clear();
-}
-
-int add_queue(map<const char*, PQueue>& r_queue, CKeyset& ks)
-{
-	if (!*ks.getvalue("queue_id"))
-		return -9;
-
-	PQueue pqueue = new CQueue;
-	strncpy(pqueue->queue_id, ks.getvalue("queue_id"), sizeof(pqueue->queue_id) - 1);
-	
-	if (*ks.getvalue("playment")) pqueue->playment = true;
-	if (*ks.getvalue("recording")) pqueue->recording = true;
-	pqueue->queueing = !strcmp(ks.getvalue("queueing"), "inline");
-
-
-	map<const char*, PQueue>::iterator it_queue = r_queue.find(pqueue->queue_id);
-	if (it_queue == r_queue.end()) {
-		r_queue[pqueue->queue_id] = pqueue;
-	}
-	else {
-		delete pqueue;
-		return -1;
-	}
-
-	return 0;
-}
-
-void CAgent::setquelist(const char* list)
-{
-	char* queueid_list = strdup(list);
-	char* next = queueid_list;
-	char* queue;
-	while (*next) {
-		queue = next;
-		next = strpbrk(next, ",;|");  // {',',';','|'} 3개 중 아무거난 구분자로 사용할 수 있다.
-		if (!next) {
-			// last token
-			rtrim(queue);
-			if (queue && *queue) {
-				queuelist.push_back(strdup(queue));
-			}
-			break;
-		}
-		*next++ = '\0';
-		rtrim(queue);
-		if (queue && *queue) {
-			queuelist.push_back(strdup(queue));
-		}
-		while (*next && *next == ' ')
-			next++;
-		queue = next;
-	}
-	free(queueid_list);
-}
-
-bool reload_queue()
+bool reload_queue(const char* path)
 {
 	const char* err1 = "콜센타환경파일 지정오류";
 	char szPath[512] = { 0, };
 	int i = 0;
 
-	map<const char*, PQueue>* l_pqueue = new map<const char*, PQueue>;
-	map<const char*, PQueue>& l_queue = *l_pqueue;
-	map<const char*, PAgent>* l_pagent = new map<const char*, PAgent>;
-	map<const char*, PAgent>& l_agent = *l_pagent;
-	map<const char*, PQueue>::iterator it_queue;
-	map<const char*, PAgent>::iterator it_agent;
-	map<const char*, PHistory>::iterator it_history;
+	map<string, PQueue>* l_pqueue = new map<string, PQueue>;
+	map<string, PQueue>& l_queue = *l_pqueue;
+	map<string, PAgent>* l_pagent = new map<string, PAgent>;
+	map<string, PAgent>& l_agent = *l_pagent;
+	map<string, PQueue>::iterator it_queue;
+	map<string, PAgent>::iterator it_agent;
+	map<string, PHistory>::iterator it_history;
 	PQueue pqueue;
 	PAgent pagent;
 	PHistory phistory;
 
 	CKeyset* pks;
-	map<const char*, CKeyset*>::iterator it_ks;
-	list<char*>::iterator it_list;
+	map<string, CKeyset*>::iterator it_ks;
+	list<string>::iterator it_list;
 
 	CFileConfig fileQueue, fileAgent;
 
 	int rc;
+
+	if (path && *path) {
+		strcpy(g_queue_path, path);
+	}
 
 	if (!*g_queue_path) {
 		conpt(err1);
@@ -445,13 +440,13 @@ bool reload_queue()
 	for (it_ks = fileQueue.m_config.begin(); it_ks != fileQueue.m_config.end(); it_ks++) {
 		pks = it_ks->second;
 #ifdef DEBUG
-		conpt("queue id: %s", it_ks->first);
+		conpt("queue id: %s", it_ks->first.c_str());
 		for (i = 0; i < pks->getcount(); i++) {
-			conpt("\t%s=%s", pks->getkey(i), pks->getvalue(i));
+			conpt("\t%s=%s", pks->getkeyname(i), pks->getvalue(i));
 		}
 #endif
 		pqueue = new CQueue;
-		strncpy(pqueue->queue_id, pks->getks(), sizeof(pqueue->queue_id) - 1);
+		strncpy(pqueue->queue_id, pks->getks().c_str(), sizeof(pqueue->queue_id) - 1);
 		strncpy(pqueue->queue_name, pks->getvalue("name"), sizeof(pqueue->queue_name) - 1);
 		pqueue->playment = *pks->getvalue("playment") == 'Y';
 		pqueue->recording = *pks->getvalue("recording") == 'Y';
@@ -471,32 +466,40 @@ bool reload_queue()
 		return false;
 	}
 
+	map<string, PAgent>::iterator iter;
+
 	for (it_ks = fileAgent.m_config.begin(); it_ks != fileAgent.m_config.end(); it_ks++) {
 		pks = it_ks->second;
 #ifdef DEBUG
-		conpt("agent id: %s", it_ks->first);
+		conpt("agent id: %s", it_ks->first.c_str());
 		for (i = 0; i < pks->getcount(); i++) {
-			conpt("\t%s=%s", pks->getkey(i), pks->getvalue(i));
+			conpt("\t%s=%s", pks->getkeyname(i), pks->getvalue(i));
 		}
 #endif
 		pagent = new CAgent;
-		strncpy(pagent->agnet_id, pks->getks(), sizeof(pagent->agnet_id) - 1);
+		strncpy(pagent->agnet_id, pks->getks().c_str(), sizeof(pagent->agnet_id) - 1);
 		strncpy(pagent->agent_pw, pks->getvalue("password"), sizeof(pagent->agent_pw) - 1);
 		strncpy(pagent->agent_name, pks->getvalue("agent_name"), sizeof(pagent->agent_name) - 1);
 		strncpy(pagent->phone, pks->getvalue("phone"), sizeof(pagent->phone) - 1);
-		pagent->setquelist(pks->getvalue("queue"));
+		// phone 은 삼담사가 사용하는 내부전화번호이다 중복되어서는 안된다 검증필요하다
+		for (iter = l_agent.begin(); iter != l_agent.end(); iter++) {
+			if (!strcmp(pagent->phone, iter->second->phone)) {
+				conpt("agent의 phone number duplicated.(agent1=%s, agen2=%s)",iter->second->agnet_id, pagent->agnet_id);
+				delete(l_pqueue);
+				delete(l_pagent);
+				return false;
+			}
+		}
+
+		pagent->setqueuelist(pks->getvalue("queue"));
 		
 		for (it_list = pagent->queuelist.begin(); it_list != pagent->queuelist.end(); it_list++) {
-			// char*를 l_queue.find(*it_list) 찾으면 안된다
-			for (it_queue = l_queue.begin(); it_queue != l_queue.end(); it_queue++) {
-				if (!strcmp(*it_list, it_queue->first)) {
-					it_queue->second->m_agent[pagent->agnet_id] = pagent;
-					conpt("add agent, queue=%s, agent=(%s:%s)", it_queue->first , pagent->agnet_id, pagent->agent_name);
-					break;
-				}
-			}
-			if (it_queue == l_queue.end()) {
-				conpt("등록되지 않은 큐에 qgent를 할당하려고 했다.환경파일 오류처리 (%s)", *it_list);
+			it_queue = l_queue.find(*it_list);
+			if (it_queue != l_queue.end()) {
+				it_queue->second->m_agent[pagent->agnet_id] = pagent;
+				conpt("add agent, queue=%s, agent=(%s:%s)", it_queue->first.c_str(), pagent->agnet_id, pagent->agent_name);
+			} else {
+				conpt("없는 큐에 agent를 할당하려고 했다.(req_queue=%s), agent=(%s:%s)", it_list->c_str(), pagent->agnet_id, pagent->agent_name);
 				delete(l_pqueue);
 				delete(l_pagent);
 				return false;
@@ -504,6 +507,7 @@ bool reload_queue()
 		}
 		l_agent[pagent->agnet_id] = pagent;
 	}
+
 
 	// -----------------------------------------------------
 	// ------ merge config & history -------------------------
@@ -517,45 +521,49 @@ bool reload_queue()
 	// 1. 큐의 히스토리 map 을 복사한다
 	for (it_history = g_history.begin(); it_history != g_history.end(); it_history++) {
 		phistory = it_history->second;
-		// char*를 l_queue.find(phistory->queue) 찾으면 안된다
-		for (it_queue = l_queue.begin(); it_queue != l_queue.end(); it_queue++) {
-			if (!strcmp(phistory->queue, it_queue->first)) {
-				l_queue.find(phistory->agent_id)->second->m_history[phistory->histoyr_key] = phistory;
-				break;
+		it_queue = l_queue.find(phistory->queue);
+		if (it_queue != l_queue.end()) {
+			map<string, PHistory>& me = it_queue->second->m_history;
+			if (me.find(it_history->first) == me.end()) {
+				me[it_history->first] = phistory;
 			}
+#ifdef DEBUG
+			else {
+				conft("history info dup. key=%s", it_history->first.c_str());
+			}
+#endif
+			break;
 		}
 	}
-	// 2. 구 에이전트 중 신 에이전트에 없는 에이전트는 접속 종료한다 (상담중인 에이전트는?)
+	// 2. 구 에이전트 중 신 에이전트에 없는 에이전트는 접속 종료하지 않는다 (상담중인 에이전트는?)
 	for (it_agent = g_pagent->begin(); it_agent != g_pagent->end(); it_agent++) {
-		pagent = it_agent->second;
-		map<const char*, PAgent>::iterator iter;
-		// char*를 l_agent.find(pagent->agnet_id) 찾으면 안된다
-		for (iter = l_agent.begin(); iter != l_agent.end(); iter++) {
-			if (!strcmp(pagent->agnet_id, iter->first)) {
-				// 이번에도 사용중으로 찾았다 
-				break;
-			}
-		}
-		if (it_agent == l_agent.end()) {
+		iter = l_agent.find(it_agent->second->agnet_id);
+		if (iter != l_agent.end()) {
+			// 이번에도 사용중으로 찾았다 
+			break;
+		} else {
+			pagent = it_agent->second;
+			pagent->reload = 1; // 삭제된 에이전트이다 
+
 #ifdef DEBUG
 			// logging
 
 #endif
 			// 구 에이전트가 새 에이전트 목록에서 삭제되었다.
-			// 접속 종료 처리......
-			// 상담중이면????
+			// 상담중이면 상담중일 수도 있다. 삭제하지 않는다
 			// 향후 추가 코딩키로....
+			// 관리자가 웹소켓으로 삭제 명령을 내릴 수 있다. (g_pold_queue,g_pold_agent 삭제)
 
 
 		}
 	}
 	// 3. 새 정보를 구 정보로 대체한다
-	map<const char*, PQueue>* g_pqueue_old = g_pqueue;
-	map<const char*, PAgent>* g_pagent_old = g_pagent;
+	if (g_pold_queue) delete(g_pold_queue);
+	if (g_pold_agent) delete(g_pold_agent);
+	g_pold_queue = g_pqueue;
+	g_pold_agent = g_pagent;
 	g_pqueue = l_pqueue;
 	g_pagent = l_pagent;
-	delete(g_pqueue_old);
-	delete(g_pagent_old);
 
 
 
@@ -576,20 +584,6 @@ bool reload_queue()
 		}
 	}
 #endif
-
-
-
-
-
-
-
-
-
-	// -----------------------------------------------------
-	// ------ agent config loading -------------------------
-	// -----------------------------------------------------
-
-
 
 	return true;
 }

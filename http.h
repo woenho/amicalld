@@ -131,6 +131,7 @@ public:
 			}
 			else if ((*pChk == '\r' && _m & ES_CR) || (*pChk == '\n' && _m & ES_LF)) {
 				*pChk = '\0';
+				break;
 			}
 		}
 	}

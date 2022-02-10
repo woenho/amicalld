@@ -36,19 +36,25 @@ void ws_writedisconnect(PTST_SOCKET psocket, uint16_t status) {
 	buf[0] = 0x80 /*0x80은 FIN설정용*/ | (0x0f & MG_WEBSOCKET_OPCODE_CONNECTION_CLOSE);
 	buf[1] = (unsigned char)req_len; // 연결해제 상태코드로 이건 4바이트다
 	uint16_t* scode = (uint16_t*)&buf[2];
-	*scode = htons(1000); // status 1002 하니까 포스트맨이 프로토콜오류처리하네.. 정상종료처리로 변경
+	*scode = htons(status); // status 1002 하니까 포스트맨이 프로토콜오류처리하네.. 정상종료처리로 변경
 	write(psocket->sd, buf, 4);
 }
 
-int ws_writetext(PTST_SOCKET psocket, const char* text) {
+int ws_writetext(PTST_SOCKET psocket, const char* fmt, ...) {
 	char buf[10];
+	char msg[4096];
 
-	if (!text)
+
+	if (!fmt)
 		return -1;
 
-	TRACE("--ws- send\n%s\n", text);
+	va_list ap;
+	va_start(ap, fmt);
+	size_t req_len = vsnprintf(msg, sizeof(msg) - 1, fmt, ap);
+	va_end(ap);
 
-	size_t req_len = strlen(text);
+	TRACE("--ws- send\n%s\n", msg);
+
 	buf[0] = 0x80 /*0x80은 FIN설정용*/ | (0x0f & MG_WEBSOCKET_OPCODE_TEXT);
 
 	if (req_len < 126) {
@@ -66,7 +72,7 @@ int ws_writetext(PTST_SOCKET psocket, const char* text) {
 		write(psocket->sd, buf, 10);
 	}
 	
-	return write(psocket->sd, text, req_len);
+	return write(psocket->sd, msg, req_len);
 }
 
 
@@ -106,7 +112,7 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 			TST_DATA& sdata = *psocket->send;	// 발신버퍼
 			sprintf(sdata.s, "요청한 uri '%s' 는 지원하지 않는 라우팅 정보입니다.", req.request_uri);
 			ws_writetext(psocket, sdata.s);
-			ws_writedisconnect(psocket, 1000);
+			ws_writedisconnect(psocket);
 
 			next = tst_disconnect;
 		}
