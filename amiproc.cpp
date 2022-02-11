@@ -26,7 +26,7 @@ tstpool server;						// 기본적인 tcp epoll 관리쓰레드 풀 클래스 객
 PTST_SOCKET ami_socket = NULL;		// ami 연결용 TST_SOCKET 구조체로 new 로 직접 생성하여 server.addsocket(ami_socket)으로 추가등록하고 epoll 도 직접 등록한다.
 map<const char*, void*> g_process;	// ami event 중 처리하고자 하는 이벹에 대한 함수포인터를 등록해 둔다
 map<const char*, const char*> g_process_name; // ami event process function anme
-int log_event_level = 0;				// 0이 아닌 값이 설정되면 event 명을 로깅한다
+int g_log_event_level = 0;				// 0이 아닌 값이 설정되면 event 명을 로깅한다
 
 void* rm_ami_socket(tst::TST_USER_T* puser) {
 	
@@ -55,7 +55,7 @@ void logging_events(AMI_EVENTS& events)
 	for (i = 0; i < events.rec_count; i++) {
 		len += sprintf(msg + len, "%s%s: %s\n", i ? "    " : "", events.key[i], events.value[i]);
 	}
-	conft("--- %s(atp threadno:%d)...\n%s\n", __func__, events.nThreadNo, msg);
+	CONFT("--- %s(atp threadno:%d)...\n%s\n", __func__, events.nThreadNo, msg);
 }
 
 int parse_amievent(AMI_EVENTS& events) {
@@ -124,7 +124,7 @@ PAMI_RESPONSE AMI_MANAGE::ami_sync(bool logprint, const char* fmt, ...)
 		, ++actionid
 		);
 	sdata.req_len = strlen((const char*)sdata.s);
-	conft("ami_sync action ---------\n%s", sdata.s);
+	CONFT("ami_sync action ---------\n%s", sdata.s);
 	struct timespec waittime;
 	clock_gettime(CLOCK_REALTIME, &waittime);	// NTP영향받아야 함
 	waittime.tv_sec += 5;
@@ -143,7 +143,7 @@ PAMI_RESPONSE AMI_MANAGE::ami_sync(bool logprint, const char* fmt, ...)
 			for (i = 0; i < pResponse->responses.rec_count; i++) {
 				len += sprintf(msg + len, "%s%s: %s\n", i ? "    " : "", pResponse->responses.key[i], pResponse->responses.value[i]);
 			}
-			conft("ami_sync response ---------\n%s", msg);
+			CONFT("ami_sync response ---------\n%s", msg);
 		}
 	}
 	else {
@@ -168,7 +168,7 @@ void AMI_MANAGE::ami_async(const char* fmt, ...)
 	if (!ami_socket || ami_socket->type != sock_client)
 		return;
 	if (ami_socket->send->s == fmt) {
-		conft("%s() action 지정은 send 버퍼를 이용하지 마시오.", __func__);
+		CONFT("%s() action 지정은 send 버퍼를 이용하지 마시오.", __func__);
 		return;
 	}
 
@@ -186,7 +186,7 @@ void AMI_MANAGE::ami_async(const char* fmt, ...)
 	);
 	sdata.req_len = strlen((const char*)sdata.s);
 
-	conft("ami_async action ---------\n%s", sdata.s);
+	CONFT("ami_async action ---------\n%s", sdata.s);
 	write(ami_socket->sd, sdata.s, sdata.req_len);
 	ami_unlock();
 }
@@ -205,8 +205,8 @@ TST_STAT ami_event(PTST_SOCKET psocket) {
 		return tst_run;
 	}
 
-	if (log_event_level > 1) {
-		conft("--- enter %s()", __func__);
+	if (g_log_event_level > 1) {
+		CONFT("--- enter %s()", __func__);
 	}
 
 	// 이하는 ami_message 만 이리 온다고 가정하고 함수 작성한다.
@@ -294,7 +294,7 @@ TST_STAT ami_event(PTST_SOCKET psocket) {
 				// AMI_MANAGE::ami_sync() 함수 사용이 잘목 되었다 확인하라!!!!!
 				// AMI_MANAGE::ami_sync() 함수를 잘못 수정하면 이리올 수도 있다....
 				manage.pResp = NULL;
-				conft("AMI_MANAGE::ami_sync() 함수를 잘못 수정한것 같다. 확인하시라!");
+				conpt("AMI_MANAGE::ami_sync() 함수를 잘못 수정한것 같다. 확인하시라!");
 			}
 		}
 
@@ -308,14 +308,14 @@ check_ami_event_handler:
 			bzero(ev_id, len);
 			strncpy(ev_id, ptr, len - 1);
 
-			if (log_event_level) {
+			if (g_log_event_level) {
 				AMI_EVENTS log;
 				strncpy(log.event, rdata.s, rdata.com_len);
 				parse_amievent(log);
-				if (log_event_level > 2) {
+				if (g_log_event_level > 2) {
 					logging_events(log);
 				} else {
-					conft("--- event --- %s --- %s", get_amivalue(log, "Channel"), ev_id);
+					CONFT("--- event --- %s --- %s", get_amivalue(log, "Channel"), ev_id);
 				}
 			}
 			map<const char*, void*>::iterator it;
@@ -338,11 +338,11 @@ check_ami_event_handler:
 		}
 	} else if (psocket->events & EPOLLOUT) {
 		clock_gettime(CLOCK_REALTIME, &sdata.trans_time);
-		conft("---send remain(%d).....", psocket->send->checked_len);
+		CONFT("---send remain(%d).....", psocket->send->checked_len);
 	} else {
 		if (psocket->events & (EPOLLHUP | EPOLLRDHUP | EPOLLERR)) {
 			// 연결이 끊어졌다.
-			conft("---흐미 AMI 끊어졌다.....");
+			CONFT("---흐미 AMI 끊어졌다.....");
 			ami_socket = NULL;
 		}
 
@@ -358,13 +358,13 @@ TST_STAT my_disconnected(PTST_SOCKET psocket) {
 
 	if (psocket == ami_socket) {
 		if (psocket->user_data->type == ami_base) {
-			conft("--- 흐미 ami 끊어졌다.....");
+			CONFT("--- 흐미 ami 끊어졌다.....");
 			ami_socket = NULL;
 		}
 	}
 	else {
 #ifdef DEBUG
-//		conft("--- disconnected client socket....%s(%s:%d)", __func__, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
+		CONFT("--- disconnected client socket....%s(%s:%d)", __func__, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
 #endif
 	}
 

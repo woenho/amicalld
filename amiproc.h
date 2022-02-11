@@ -101,7 +101,7 @@ extern PTST_SOCKET ami_socket;		// ami 연결용 TST_SOCKET 구조체로 new 로
 extern map<const char*, void*> g_process;
 extern map<const char*, const char*> g_process_name;
 #define ADD_AMI_EVENT_PROCESS(a, b)	{g_process[a] = (void*)b; g_process_name[a] = #b;}
-extern int log_event_level;
+extern int g_log_event_level;
 
 int parse_amievent(AMI_EVENTS& events);
 const char* get_amivalue(AMI_EVENTS& events, const char* key);

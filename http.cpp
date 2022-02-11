@@ -11,9 +11,10 @@
 #include "http.h"
 #include "websocket.h"
 
-
 map<const char*, void*> g_route;
 map<const char*, const char*> g_route_name;
+
+TST_STAT file_service(PTST_SOCKET psocket, REQUEST_INFO& req);
 
 // 일단 기동되는 tcp 서버는 HTTP 프로토콜을 지원하도록 한다
 // 외부에서 amiprocess에 연결하여 요청하는 것은 기본적으로 http GET 메소드를 지원한다
@@ -89,12 +90,16 @@ void response_http(PTST_SOCKET psocket, PRESPONSE_INFO presp)
 		sdata.com_len += snprintf(sdata.s + sdata.com_len, sdata.s_len - sdata.com_len, "%s: %s\r\n"
 			, presp->http_headers[i].name, presp->http_headers[i].value);
 	}
+	int headerlen = sdata.com_len;
+	// 보내는 사이즈가 sdata.s_len 이상인것은 일단 무시하자....
+	if (presp->html_text && *presp->html_text) {
+		sdata.com_len += snprintf(sdata.s + sdata.com_len, sdata.s_len - sdata.com_len, "Content-Length: %u\r\n\r\n"
+			, (uint32_t)strlen(presp->html_text));
+		headerlen = sdata.com_len;
+		sdata.com_len += snprintf(sdata.s + sdata.com_len, sdata.s_len - sdata.com_len, "%s", presp->html_text);
+	}
 
-	if(presp->html_text && *presp->html_text)
-		sdata.com_len += snprintf(sdata.s + sdata.com_len, sdata.s_len - sdata.com_len, "Content-Length: %u\r\n\r\n%s\r\n\r\n"
-			, (uint32_t)strlen(presp->html_text), presp->html_text);
-
-	TRACE("--http- send\n%s", sdata.s);
+	conpt("--http-send sd=%d\n%.*s\n%s", psocket->sd, headerlen > 128 ? 128 : headerlen, sdata.s, presp->html_text ? presp->html_text : "");
 	write(psocket->sd, sdata.s, sdata.com_len);
 	clock_gettime(CLOCK_REALTIME, &sdata.trans_time);
 
@@ -177,7 +182,8 @@ TST_STAT http(PTST_SOCKET psocket)
 
 		// 자 이제 한 메시지를 받았다 파싱해야한다
 		rdata.s[rdata.req_pos + rdata.com_len] = '\0';
-		TRACE("--http- http protocol....\n%s", rdata.s + rdata.req_pos);
+		if (g_log_event_level)
+			CONFT("--http-read sd=%d\n%s", psocket->sd, rdata.s + rdata.req_pos);
 
 		if (!psocket->user_data) {
 			// user_data 가 설정되지 않았다면 http header를 수신했다
@@ -256,7 +262,7 @@ TST_STAT http(PTST_SOCKET psocket)
 			}
 
 			// 이거 살리면 keep-alive용 전문 로깅 많다 헐...
-			// conft("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
+			TRACE("%s(), uri=%s, querystr=%s\n", __func__, req.request_uri, req.query_string);
 
 			if (req.request_uri && *req.request_uri) urlDecodeRewite(req.request_uri);
 			if (req.query_string && *req.query_string) urlDecodeRewite((char*)req.query_string);
@@ -353,7 +359,7 @@ TST_STAT http(PTST_SOCKET psocket)
 					return next;
 				}
 			}
-
+#if 0
 			if (!strcmp(req.request_uri, "/favicon.ico")) {
 				// sdata.com_len = sprintf(sdata.s, "HTTP/1.1 404 Not found\r\n\r\n");	// 404는 헤더를 첨부하지 않는다. 이후 모든 것은 body로 처리된다
 				
@@ -364,19 +370,23 @@ TST_STAT http(PTST_SOCKET psocket)
 				response_http(psocket, &resp);
 			} else {
 
-				conft("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
+				CONFT("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
 
-				rdata.com_len = sprintf(rdata.s, "<HTML><HEAD></HEAD><BODY>잘 수신했읍니다.<br>그러나 아직 이에 대한 처리를 구현하지 않았음...</BODY></HTML>");
+				sprintf(rdata.s, "<HTML><HEAD></HEAD><BODY>잘 수신했읍니다.<br>그러나 아직 이에 대한 처리를 구현하지 않았음...</BODY></HTML>");
 				resp.http_version = req.http_version;
 				resp.http_code = 501;
 				resp.response_text = "Not Implemented";
 				resp.html_text = rdata.s;
 				response_http(psocket, &resp);
 			}
-		} else {
-			conft("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
+#endif
+			return file_service(psocket, req);
 
-			rdata.com_len = sprintf(rdata.s, "<HTML><HEAD></HEAD><BODY>잘 수신했읍니다.<br>그러나 아직 지원하지않는 메소드입니다.</BODY></HTML>");
+
+		} else {
+			CONFT("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
+
+			sprintf(rdata.s, "<HTML><HEAD></HEAD><BODY>잘 수신했읍니다.<br>그러나 아직 지원하지않는 메소드입니다.</BODY></HTML>");
 			resp.http_version = req.http_version;
 			resp.http_code = 501;
 			resp.response_text = "Not Implemented";
@@ -384,8 +394,9 @@ TST_STAT http(PTST_SOCKET psocket)
 			response_http(psocket, &resp);
 		}
 		rdata.reset_data();
-	}
-	else if (psocket && psocket->events & EPOLLOUT) {
+	} else if (psocket && psocket->events & EPOLLOUT) {
+		// 보내줄 것??????
+		// 지금은 지원하지 않는다
 		clock_gettime(CLOCK_REALTIME, &sdata.trans_time);
 		if (!sdata.checked_len) {
 			printf("try disconnect http protocol....\n");
@@ -405,3 +416,142 @@ TST_STAT http(PTST_SOCKET psocket)
 	return tst_disconnect;
 }
 
+TST_STAT file_service(PTST_SOCKET psocket, REQUEST_INFO& req)
+{
+	TST_DATA& rdata = *psocket->recv;	// 수신버퍼
+	TST_DATA& sdata = *psocket->send;	// 수신버퍼
+	RESPONSE_INFO resp;
+										// 파일 억세스 지원필요하다.... 웹소켓에서 사용랄 웹페이지 억세스 허락하자
+	if (strlen(req.request_uri) < 2) {
+		// error '/' 만 들어 왔거나 아예 url 정보가 없다 , 이경우 index.html이 있으면 보내주는 건데 오류처리할꺼다...
+		CONFT("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
+
+		sprintf(rdata.s, "<HTML><HEAD></HEAD><BODY>잘 수신했읍니다.<br>그러나 아직 이에 대한 처리를 구현하지 않았음...</BODY></HTML>");
+		resp.http_version = req.http_version;
+		resp.http_code = 501;
+		resp.response_text = "Not Implemented";
+		resp.html_text = rdata.s;
+		response_http(psocket, &resp);
+		rdata.reset_data();
+		return tst_disconnect;
+	}
+	string senddata;
+	// 파일이 존재 하느짖 확인한다.
+	// 웹서버의 기본 홈디렉토리는 현재 작업폴더 아래의 www 로 고정한다.
+
+	// 파일 검색
+	const char* path = "./www";
+	char tmp[512];
+	struct stat   st;
+
+	if (!strcmp(req.request_uri, "/dir_list")) {
+		DIR* dir_ptr = NULL;
+		struct dirent* file = NULL;
+
+		/* 목록을 읽을 디렉토리명으로 DIR *를 return 받습니다. */
+		if ((dir_ptr = opendir(path)) == NULL) {
+			/* path가 디렉토리가 아니라면 종료합니다. */
+			CONFT("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
+
+			sprintf(rdata.s, "<HTML><HEAD></HEAD><BODY>잘 수신했읍니다.<br>그러나 아직 이에 대한 처리를 구현하지 않았음...</BODY></HTML>");
+			resp.http_version = req.http_version;
+			resp.http_code = 501;
+			resp.response_text = "Not Implemented";
+			resp.html_text = rdata.s;
+			response_http(psocket, &resp);
+			rdata.reset_data();
+			return tst_disconnect;
+		}
+
+		/* 디렉토리의 처음부터 파일 또는 디렉토리명을 순서대로 한개씩 읽습니다. */
+		while ((file = readdir(dir_ptr)) != NULL) {
+#if 0
+			if (!strcmp(file->d_name, ".") || !strcmp(file->d_name, "..")) {
+				continue;
+			}
+#endif
+			/* 파일의 속성(파일의 유형, 크기, 생성/변경 시간 등을 얻기 위하여 */
+			sprintf(tmp, "%s/%s", path, file->d_name);
+			if (lstat(tmp, &st) == -1) {
+				CONPT("lstat error path=%s, msg=%s", file->d_name, strerror(errno));
+				continue;
+			}
+
+			sprintf(tmp, "%c %8d %s\n"
+					, S_ISDIR(st.st_mode) ? 'd' : S_ISREG(st.st_mode) ? 'f' : S_ISLNK(st.st_mode) ? 'l' : ' '
+					, st.st_size, file->d_name);
+			senddata += tmp;
+		}
+
+		/* open된 directory 정보를 close 합니다. */
+		closedir(dir_ptr);
+
+		// 읽어들인 파일 내용을 클라이언트에 내려보내준다
+		CONFT("%s(), uri=%s, querystr=%s:", __func__, req.request_uri, req.query_string);
+
+		resp.http_version = req.http_version;
+		resp.http_code = 200;
+		resp.response_text = "dir list ok";
+		resp.html_text = senddata.c_str();
+		response_http(psocket, &resp);
+		rdata.reset_data();
+		return tst_disconnect;
+	}
+	
+	// dir_list 가 아닌경우 파일 요청이라고 판단한다
+	sprintf(tmp, "%s/%s", path, req.request_uri + 1);
+	if (lstat(tmp, &st) == -1) {
+		resp.http_version = req.http_version;
+		resp.http_code = 404;
+		resp.response_text = "file not found";
+		resp.html_text = NULL;
+		response_http(psocket, &resp);
+		rdata.reset_data();
+		return tst_disconnect;
+	}
+
+	char* ext = strrchr(tmp, '.');
+	if (!ext) {
+		ext = "xxx";
+	} else {
+		ext++;
+	}
+
+	FILE* fd;
+	fd = fopen(tmp, "r");
+	if (fd)//파일이 열렸는지 확인
+	{
+		resp.http_version = req.http_version;
+		resp.http_code = 200;
+		resp.response_text = "OK";
+		if (!strcmp(ext, "htm")) {
+			resp.addHeader("Content-Type", "text/html;charset-utf-8");
+		} else if(!strcmp(ext, "css")) {
+			resp.addHeader("Content-Type", "text/css;charset-utf-8");
+		} else if(!strcmp(ext, "js")) {
+			resp.addHeader("Content-Type", "Application/javascript");
+		} else {
+			resp.addHeader("Content-Type", "Application/octet-stream");
+		}
+		sprintf(tmp, "%d", st.st_size);
+		resp.addHeader("Content-Length", tmp);
+		resp.html_text = NULL;
+		response_http(psocket, &resp);
+		write(psocket->sd, "\r\n", 2);
+
+		while(true) {
+			sdata.com_len = fread(sdata.s, sizeof(char), sdata.s_len -1, fd);
+			if (sdata.com_len < 1)
+				break;
+			CONFT("file data send sd=%d, len=%d", psocket->sd, sdata.com_len);
+			write(psocket->sd, sdata.s, sdata.com_len);
+		}
+		clock_gettime(CLOCK_REALTIME, &sdata.trans_time);
+	}
+	fclose(fd);    //파일 닫기
+
+
+	rdata.reset_data();
+
+	return tst_disconnect;
+}

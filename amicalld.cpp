@@ -73,16 +73,16 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 		int nQueueNormal = atp_getNormalQueueCount();
 		int nIndx;
 
-		conft("atp compile date: %s", atpCompileDate);
-		conft("tst compile date: %s", tstCompileDate);
-		conft("util compile date: %s", amiutilCompileDate);
-		conft("calld compile date: %s", amicalldCompileDate);
+		CONFT("atp compile date: %s", atpCompileDate);
+		CONFT("tst compile date: %s", tstCompileDate);
+		CONFT("util compile date: %s", amiutilCompileDate);
+		CONFT("calld compile date: %s", amicalldCompileDate);
 
-		conft("atp thread Realtime queue count=%d", nQueueRealtime);
-		conft("atp thread Normal queue count=%d", nQueueNormal);
+		CONFT("atp thread Realtime queue count=%d", nQueueRealtime);
+		CONFT("atp thread Normal queue count=%d", nQueueNormal);
 
 		for (nIndx = 0; nIndx < nCount; nIndx++) {
-			conft("atp threadno=%d, realtime execute=%lu average elapsed=%.3f, normal execute=%lu average elapsed=%.3f"
+			CONFT("atp threadno=%d, realtime execute=%lu average elapsed=%.3f, normal execute=%lu average elapsed=%.3f"
 				, pThread[nIndx].nThreadNo
 				, pThread[nIndx].nRealtimeCount
 				, atp_getAverageRealtimeWorkingtime(nIndx) / 1e+3	// 평균 작업소요 시간(mili)
@@ -92,7 +92,7 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 		}
 		// tstpoll
 		for (nIndx = 0; nIndx < (int)server.m_thread_count; nIndx++) {
-			conft("tst threadno=%d, execute=%lu average elapsed=%.3f, most_elapsed=%.3f"
+			CONFT("tst threadno=%d, execute=%lu average elapsed=%.3f, most_elapsed=%.3f"
 				, server.m_workers[nIndx].thread_no
 				, server.m_workers[nIndx].exec_count
 				, server.m_workers[nIndx].get_averageElapsedtime() / 1e+3
@@ -101,9 +101,9 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 		}
 		CWebConfig cfg;
 		if (cfg.Open(cfg_path) > 0) {
-			log_event_level = atoi(cfg.Get("LOG","ev_level").c_str());
+			g_log_event_level = atoi(cfg.Get("LOG","ev_level").c_str());
 		}
-		conft("log_event_level=%d", log_event_level);
+		conpt("g_log_event_level=%d", g_log_event_level);
 		
 		reload_queue();
 	}
@@ -115,16 +115,16 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 		int nQueueNormal = atp_getNormalQueueCount();
 		int nIndx;
 
-		conft("atp compile date: %s", atpCompileDate);
-		conft("tst compile date: %s", tstCompileDate);
-		conft("util compile date: %s", amiutilCompileDate);
-		conft("calld compile date: %s", amicalldCompileDate);
+		CONFT("atp compile date: %s", atpCompileDate);
+		CONFT("tst compile date: %s", tstCompileDate);
+		CONFT("util compile date: %s", amiutilCompileDate);
+		CONFT("calld compile date: %s", amicalldCompileDate);
 
-		conft("atp thread Realtime queue count=%d", nQueueRealtime);
-		conft("atp thread Normal queue count=%d", nQueueNormal);
+		CONFT("atp thread Realtime queue count=%d", nQueueRealtime);
+		CONFT("atp thread Normal queue count=%d", nQueueNormal);
 
 		for (nIndx = 0; nIndx < nCount; nIndx++) {
-			conft("atp threadno=%d, realtime execute=%lu average elapsed=%.3f, normal execute=%lu average elapsed=%.3f"
+			CONFT("atp threadno=%d, realtime execute=%lu average elapsed=%.3f, normal execute=%lu average elapsed=%.3f"
 				, pThread[nIndx].nThreadNo
 				, pThread[nIndx].nRealtimeCount
 				, atp_getAverageRealtimeWorkingtime(nIndx) / 1e+3	// 평균 작업소요 시간(mili)
@@ -136,7 +136,7 @@ void sig_handler(int signo, siginfo_t* info, /*ucontext_t*/void* ucp)
 
 		// tstpoll
 		for (nIndx = 0; nIndx < (int)server.m_thread_count; nIndx++) {
-			conft("tst threadno=%d, execute=%lu average elapsed=%.3f, most_elapsed=%.3f"
+			CONFT("tst threadno=%d, execute=%lu average elapsed=%.3f, most_elapsed=%.3f"
 				, server.m_workers[nIndx].thread_no
 				, server.m_workers[nIndx].exec_count
 				, server.m_workers[nIndx].get_averageElapsedtime() / 1e+3
@@ -186,20 +186,20 @@ TST_STAT calld_disconnected(PTST_SOCKET psocket) {
 
 	if (psocket == ami_socket) {
 		// if (psocket->type == sock_client && psocket->user_data->type == ami_base) {
-			conpt("--- 흐미 ami 끊어졌다.....");
+			CONFT("--- 흐미 ami 끊어졌다.....");
 			ami_socket = NULL;
 		// }
 	} else {
-#ifdef DEBUG
-		conpt("--- disconnected client socket....sd=%d, type=%d (%s:%d)", psocket->sd, psocket->type, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
-#endif
+		if(g_log_event_level)
+			CONFT("--- disconnected client socket....sd=%d, type=%d (%s:%d)", psocket->sd, psocket->type, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
+
 		if (psocket->type == sock_websocket) {
-			TRACE("--ws- websocket session이 해제되었다.\n");
+			CONFT("--ws-websocket session이 해제되었다.\n");
 			
 			// websocket 해제 시 keepalive 중단 처리필요함
 			if (g_processmon_sd == psocket->sd) {
 				g_processmon_sd = 0;
-				conpt("--- disconnected processmon socket....sd=%d (%s:%d)", psocket->sd, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
+				CONFT("--- disconnected processmon socket....sd=%d (%s:%d)", psocket->sd, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
 			}
 
 			// agent 가 접속 종료하면 그 상태처리를 한다.
@@ -278,22 +278,22 @@ int main(int argc, char* argv[])
 
 
 #if defined(DEBUGTRACE)
-	conft("\n------------------------\n trace debuging info CALLD server start. pid(%d)\n========================================", getpid());
+	CONFT("\n------------------------\n trace debuging info CALLD server start. pid(%d)\n========================================", getpid());
 #elif defined(DEBUG)
-	conft("\n------------------------\n possible debuging CALLD server start. pid(%d)\n========================================", getpid());
+	CONFT("\n------------------------\n possible debuging CALLD server start. pid(%d)\n========================================", getpid());
 #else
-	conft("\n------------------------\n optimization CALLD server start. pid(%d)\n========================================", getpid());
+	CONFT("\n------------------------\n optimization CALLD server start. pid(%d)\n========================================", getpid());
 #endif
-	conft("atp compile date: %s", atpCompileDate);
-	conft("tst compile date: %s", tstCompileDate);
-	conft("util compile date: %s", amiutilCompileDate);
-	conft("calld compile date: %s", amicalldCompileDate);
+	CONFT("atp compile date: %s", atpCompileDate);
+	CONFT("tst compile date: %s", tstCompileDate);
+	CONFT("util compile date: %s", amiutilCompileDate);
+	CONFT("calld compile date: %s", amicalldCompileDate);
 
 	if (signal_init(&sig_handler, true) < 0)
 		return -1;
 
-	log_event_level = atoi(g_cfg.Get("LOG", "ev_level").c_str());
-	conft("log_event_level=%d", log_event_level);
+	g_log_event_level = atoi(g_cfg.Get("LOG", "ev_level").c_str());
+	CONFT("g_log_event_level=%d", g_log_event_level);
 
 
 
@@ -309,7 +309,7 @@ int main(int argc, char* argv[])
 					, http
 					, 4096
 					, 4096) < 1) {
-		conft("---쓰레드풀이 기동 되지 못했다....");
+		conpt("---쓰레드풀이 기동 되지 못했다....");
 		return 0;
 	}
 
@@ -330,7 +330,7 @@ int main(int argc, char* argv[])
 	map<const char*, const char*>::iterator it_name;
 	for (it = g_process.begin(); it != g_process.end(); it++) {
 		it_name = g_process_name.find(it->first);
-		conft(":%s: -> %s(), address -> %lX", it->first, it_name == g_process_name.end() ? "" : it_name->second, ADDRESS(it->second));
+		conpt(":%s: -> %s(), address -> %lX", it->first, it_name == g_process_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	g_route.clear();
@@ -339,7 +339,7 @@ int main(int argc, char* argv[])
 	ADD_HTTP_EVENT_PROCESS("/keepalive", http_alive);
 	for (it = g_route.begin(); it != g_route.end(); it++) {
 		it_name = g_route_name.find(it->first);
-		conft(":%s: -> %s(), address -> %lX", it->first, it_name == g_route_name.end() ? "" : it_name->second, ADDRESS(it->second));
+		conpt(":%s: -> %s(), address -> %lX", it->first, it_name == g_route_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	g_websocket.clear();
@@ -348,7 +348,7 @@ int main(int argc, char* argv[])
 	ADD_WS_EVENT_PROCESS("/login", websocket_login);
 	for (it = g_websocket.begin(); it != g_websocket.end(); it++) {
 		it_name = g_websocket_name.find(it->first);
-		conft(":%s: -> %s(), address -> %lX", it->first, it_name == g_websocket_name.end() ? "" : it_name->second, ADDRESS(it->second));
+		conpt(":%s: -> %s(), address -> %lX", it->first, it_name == g_websocket_name.end() ? "" : it_name->second, ADDRESS(it->second));
 	}
 
 	// -------------------------------------------------------------------------------------
@@ -369,14 +369,14 @@ int main(int argc, char* argv[])
 			strncpy(login.Secret, g_cfg.Get("AMI", "secret", "call").c_str(), sizeof(login.Secret));
 			atpdata->func = amiLogin;
 			atp_addQueue(atpdata);
-			conft("REQUEST ami login...\n");
+			CONFT("REQUEST ami login...\n");
 		}
 		sleep(3);
 	}
 
 
 
-	conft("---쓰레드풀을 종료합니다.....\n");
+	CONFT("---쓰레드풀을 종료합니다.....\n");
 
 	server.destroy();
 
@@ -529,7 +529,7 @@ bool reload_queue(const char* path)
 			}
 #ifdef DEBUG
 			else {
-				conft("history info dup. key=%s", it_history->first.c_str());
+				CONFT("history info dup. key=%s", it_history->first.c_str());
 			}
 #endif
 			break;

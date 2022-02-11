@@ -277,14 +277,14 @@ PAMI_RESPONSE amiSendDtmf(const char* caller, const char* dir, const char* dtmf)
 	}
 
 	if (get_DTMFcallinfo(caller, &ci)) {
-		conft("channel get not found(caller=%s)\n", caller);
+		CONFT("channel get not found(caller=%s)\n", caller);
 		resp = new AMI_RESPONSE;
 		resp->result = 404;
 		sprintf(resp->msg, "channel get not found(caller=%s)", caller);
 		return resp;
 	}
 
-	conft("/dtmf caller->%s, dtmf->%s, dir->%s, Channel->%s, DestChannel->%s\n", caller, dtmf, dir, ci.szChannel, ci.szDestChannel);
+	CONFT("/dtmf caller->%s, dtmf->%s, dir->%s, Channel->%s, DestChannel->%s\n", caller, dtmf, dir, ci.szChannel, ci.szDestChannel);
 
 	AMI_MANAGE& manage = *(PAMI_MANAGE)ami_socket->user_data->s;
 
@@ -333,14 +333,14 @@ PAMI_RESPONSE amiBlindTransfer(const char* caller, const char* callee, const cha
 	CallInfo_t ci = { 0 };
 
 	if (get_DTMFcallinfo(caller, &ci)) {
-		conft("channel get not found(caller=%s)\n", caller);
+		CONFT("channel get not found(caller=%s)\n", caller);
 		resp = new AMI_RESPONSE;
 		resp->result = 404;
 		sprintf(resp->msg, "channel get not found(caller=%s)", caller);
 		return resp;
 	}
 
-	conft("/transfer caller->%s, channels->%s, callee=%s", caller, ci.szDestChannel, callee);
+	CONFT("/transfer caller->%s, channels->%s, callee=%s", caller, ci.szDestChannel, callee);
 
 	AMI_MANAGE& manage = *(PAMI_MANAGE)ami_socket->user_data->s;
 

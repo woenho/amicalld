@@ -9,7 +9,7 @@ TST_STAT http_dtmf(PTST_SOCKET psocket)
 	RESPONSE_INFO resp;
 
 	// decoding 된 쿼리스트링도 로깅하자
-	conft("%s(), querystr=%s:", __func__, req.query_string);
+	CONFT("%s(), querystr=%s:", __func__, req.query_string);
 
 	CQueryString qs(req.query_string, CQueryString::ALL);
 
@@ -48,7 +48,7 @@ TST_STAT http_transfer(PTST_SOCKET psocket)
 	RESPONSE_INFO resp;
 
 	// decoding 된 쿼리스트링도 로깅하자
-	conft("%s(), querystr=%s:", __func__, req.query_string);
+	CONFT("%s(), querystr=%s:", __func__, req.query_string);
 
 	CQueryString qs(req.query_string, CQueryString::ALL);
 
@@ -83,7 +83,7 @@ TST_STAT http_alive(PTST_SOCKET psocket)
 	// TST_DATA& sdata = *psocket->send;	// 발신버퍼
 	RESPONSE_INFO resp;
 
-	// conft("%s(), querystr=%s:", __func__, req.query_string);
+	TRACE("%s(), querystr=%s:", __func__, req.query_string);
 
 	CQueryString qs(req.query_string, CQueryString::ALL);
 	resp.http_version = req.http_version;

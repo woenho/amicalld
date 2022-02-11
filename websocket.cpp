@@ -11,8 +11,6 @@
 #include "websocket.h"
 #include "util.h"
 
-extern int log_event_level;
-
 map<const char*, void*> g_websocket;
 map<const char*, const char*> g_websocket_name;
 
@@ -53,7 +51,8 @@ int ws_writetext(PTST_SOCKET psocket, const char* fmt, ...) {
 	size_t req_len = vsnprintf(msg, sizeof(msg) - 1, fmt, ap);
 	va_end(ap);
 
-	TRACE("--ws- send\n%s\n", msg);
+	if (g_log_event_level)
+		CONFT("--ws-send sd=%d:%s:", psocket->sd, msg);
 
 	buf[0] = 0x80 /*0x80은 FIN설정용*/ | (0x0f & MG_WEBSOCKET_OPCODE_TEXT);
 
@@ -84,7 +83,8 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 
 	// 처음 연결된 것인가?
 	if (psocket->type == sock_sub) {
-		TRACE("--ws- connected\n");
+		if (g_log_event_level)
+			CONFT("--ws- connected sd=%d (%s:%d)", psocket->sd, inet_ntoa(psocket->client.sin_addr), ntohs(psocket->client.sin_port));
 		psocket->type = sock_websocket;
 		//data_len = sprintf(data, "{\"code\":%03d, \"msg\":\"%s\"}", 200, "ok. I will disconnect websocket session");
 		// 처음 연결되었을 때  하고 싶은것이 있다면.....
@@ -100,7 +100,8 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 			// printf(":%s: http func address -> %lX\n", it->first, ADDRESS(it->second));
 			if (!strcmp(req.request_uri, it->first)) {
 				ws.websocket_func = (tstFunction)it->second;
-				TRACE("--ws- ws routes-> %s\n", req.request_uri);
+				if (g_log_event_level)
+					CONFT("--ws- routes-> %s, sd=%d", req.request_uri, psocket->sd);
 				break;
 			}
 		}
@@ -200,7 +201,8 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 
 	WS_INFO& wsinfo = *(PWS_INFO)psocket->user_data->s;
 
-	TRACE("--ws- recv message %s\n", wsinfo.step ? "end" : "start");
+	if (g_log_event_level)
+		CONFT("--ws- sd=%d, recv message %s\n", psocket->sd, wsinfo.step ? "end" : "start");
 
 	// 이미 기본 헤더를 받은 경우의 처리 ( 헤더를 받고 데이타가 커서 데이타 수신일 수도 있다.)
 	if (!wsinfo.step) {
@@ -277,19 +279,19 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 	// 모든 데이타 받기가 종료된 다음 복호화 작업을 한다
 	if (wsinfo.is_masked) {
 		uint64_t i;  // 64bit CPU는 BYTE 나 64bit 처리속도가 같다. 32bit CPU or OS 라면 성능 차이 있다.
-		TRACE("--ws- completed websocket data length=%ld\n", wsinfo.data_len);
+		TRACE("--ws- sd=%d, masked, completed websocket data length=%ld\n", psocket->sd, wsinfo.data_len);
 		for (i = 0; i < wsinfo.data_len; i++) {
 			wsinfo.data[i] ^= wsinfo.mask[i & 3];
 		}
 	}
 	
-	if (log_event_level > 0) {
+	if (g_log_event_level > 0) {
 		if (wsinfo.is_close) {
-			conft("ws-read\nopcode=%0.2X, len=%d, end_status=%d", wsinfo.opcode, wsinfo.data_len, ntohs(*(uint16_t*)wsinfo.data));
+			CONFT("--ws-read sd=%d, opcode=%0.2X, len=%d, end_status=%d", psocket->sd, wsinfo.opcode, wsinfo.data_len, ntohs(*(uint16_t*)wsinfo.data));
 		} else if (wsinfo.is_text) {
-			conft("ws-read\nopcode=%0.2X, len=%d msg=:%s:", wsinfo.opcode, wsinfo.data_len, wsinfo.data ? wsinfo.data : "");
+			CONFT("--ws-read sd=%d, opcode=%0.2X, len=%d msg=:%s:", psocket->sd, wsinfo.opcode, wsinfo.data_len, wsinfo.data ? wsinfo.data : "");
 		} else {
-			conft("ws-read\nopcode=%0.2X, len=%d", wsinfo.opcode, wsinfo.data_len);
+			CONFT("--ws-read sd=%d, opcode=%0.2X, len=%d", psocket->sd, wsinfo.opcode, wsinfo.data_len);
 		}
 	}
 
@@ -317,7 +319,7 @@ TST_STAT websocket(PTST_SOCKET psocket) {
 
 	// 다음데이타를 연이어 받지 않는 일반적인 경우라면 반드시 리셋 되어야 한다
 	prdata->reset_data();
-	bzero(psocket->user_data->s, psocket->user_data->s_len);
+	wsinfo.init();
 
 
 	return  next;

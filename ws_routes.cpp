@@ -3,8 +3,6 @@
 #include "amiproc.h"
 #include "amicalld.h"
 
-extern int log_event_level;
-
 int g_processmon_sd = 0;
 
 TST_STAT websocket_basecheck(PTST_SOCKET psocket)
@@ -15,23 +13,23 @@ TST_STAT websocket_basecheck(PTST_SOCKET psocket)
 	WS_INFO& wsinfo = *(PWS_INFO)psocket->user_data->s;
 
 	if (wsinfo.is_ping) {
-		TRACE("--ws- recv ping opcode\n");
+		TRACE("--ws-recv ping opcode\n");
 		ws_writepong(psocket);
 		return tst_suspend;
 	}
 
 	if (wsinfo.is_pong) {
-		TRACE("--ws- recv pong opcode\n");
+		TRACE("--ws-recv pong opcode\n");
 		return tst_suspend;
 	}
 
 	if (wsinfo.is_close) {
-		TRACE("--ws- recv disconnect opcode\n");
+		TRACE("--ws-recv disconnect opcode\n");
 		return tst_disconnect;
 	}
 
 	if (wsinfo.is_bin) {
-		TRACE("--ws- recv binary opcode\n");
+		TRACE("--ws-recv binary opcode\n");
 		// 아직 지원하지 않는다
 		ws_writetext(psocket, "opcode binary는 지원하지 않는다");
 		return tst_suspend;
@@ -43,7 +41,7 @@ TST_STAT websocket_basecheck(PTST_SOCKET psocket)
 		return tst_disconnect;
 	}
 
-	TRACE("--ws- recv text opcode, len=%lu:%s:\n", wsinfo.data_len, wsinfo.data);
+	TRACE("--ws-recv text, len=%lu:%s:\n", wsinfo.data_len, wsinfo.data);
 
 	// 들어온 데이타는 text 이다...
 	if (wsinfo.data_len < 1) {

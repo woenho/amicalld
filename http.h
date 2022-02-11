@@ -4,6 +4,7 @@
 
 #include "tst.h"
 #include "AsyncThreadPool.h"
+#include "amiproc.h"
 
 using namespace std;
 using namespace tst;

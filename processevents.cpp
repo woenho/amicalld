@@ -80,10 +80,10 @@ ATP_STAT event_userevent(AMI_EVENTS& events)
 			strncpy(ci.szChannel, szChannel, sizeof(ci.szChannel) - 1);
 			strncpy(ci.szUniqueid, szUniqueid, sizeof(ci.szUniqueid) - 1);
 			if (set_DTMFcallinfo(szCallerIDNum, &ci)) {
-				conft("/set_callinfo error, caller=%s", szCallerIDNum);
+				CONFT("/set_callinfo error, caller=%s", szCallerIDNum);
 			}
 			else {
-				conft("/set_callinfo, caller=%s, Channel=%s", szCallerIDNum, szChannel);
+				CONFT("/set_callinfo, caller=%s, Channel=%s", szCallerIDNum, szChannel);
 			}
 
 		} else if (!strcmp(szEventName, "DTMF_STOP")) {
@@ -123,10 +123,10 @@ ATP_STAT event_userevent(AMI_EVENTS& events)
 
 	} catch (util_exception& e) {
 		if (e.code() != 999) {
-			conft("m_code=%d, %s", e.code(), e.what());
+			CONFT("m_code=%d, %s", e.code(), e.what());
 		}
 	} catch (...) {
-		conft("errno=%d, %s", errno, strerror(errno));
+		CONFT("errno=%d, %s", errno, strerror(errno));
 	}
 
 	return next;
@@ -193,7 +193,7 @@ ATP_STAT event_dialend(AMI_EVENTS& events)
 			szCallerIDNum = get_amivalue(events, "CallerIDNum");
 #if defined(USE_USEREVENT_CALLSTARTED)
 			if (get_DTMFcallinfo(szCallerIDNum, &ci)) {
-				conft("memcached get not found, caller=%s\n", szCallerIDNum);
+				CONFT("memcached get not found, caller=%s\n", szCallerIDNum);
 				throw util_exception(999, "memcached get not found");
 			}
 #endif
@@ -226,19 +226,19 @@ ATP_STAT event_dialend(AMI_EVENTS& events)
 			strncpy(ci.szDestChannel, szDestChannel, sizeof(ci.szDestChannel) - 1);
 			strncpy(ci.szDestUniqueid, szDestUniqueid, sizeof(ci.szDestUniqueid) - 1);
 			if (set_DTMFcallinfo(szCallerIDNum, &ci)) {
-				conft("/set_callinfo error, caller=%s", szCallerIDNum);
+				CONFT("/set_callinfo error, caller=%s", szCallerIDNum);
 			}
 			else {
-				conft("/set_callinfo, caller=%s, exten=%s, Channel=%s, DestChannel=%s", szCallerIDNum, szExten, szChannel, szDestChannel);
+				CONFT("/set_callinfo, caller=%s, exten=%s, Channel=%s, DestChannel=%s", szCallerIDNum, szExten, szChannel, szDestChannel);
 			}
 
 		}
 	}
 	catch (exception& e) {
-		conft("errno=%d, %s", errno, e.what());
+		CONFT("errno=%d, %s", errno, e.what());
 	}
 	catch (...) {
-		conft("errno=%d, %s", errno, strerror(errno));
+		CONFT("errno=%d, %s", errno, strerror(errno));
 	}
 
 	return stat_suspend;
